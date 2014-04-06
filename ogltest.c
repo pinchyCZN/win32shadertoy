@@ -1,8 +1,11 @@
 #include <windows.h>
 #include <stdio.h>
+#include <math.h>
 #include <GL/gl.h>
 #include "resource.h"
 #include "glext.h"
+#include "sample.h"
+
 static PFNGLCREATEPROGRAMPROC glCreateProgram;
 static PFNGLSHADERSOURCEPROC glShaderSource;
 static PFNGLCOMPILESHADERPROC glCompileShader;
@@ -24,6 +27,7 @@ static PFNGLPROGRAMUNIFORM4FVPROC glProgramUniform4fv;
 static PFNGLGETUNIFORMFVPROC glGetUniformfv;
 static PFNGLGETUNIFORMIVPROC glGetUniformiv;
 
+int pause=FALSE;
 int screenw=1360;
 int screenh=768;
 HWND hview=0;
@@ -43,7 +47,16 @@ char *preamble= "uniform vec3      iResolution;           // viewport resolution
 "uniform vec4      iDate;                 // (year, month, day, time in seconds)\r\n\r\n"
 ;
 
-
+int move_console(int x,int y)
+{
+	BYTE Title[MAX_PATH]; 
+	HANDLE hConWnd; 
+	GetConsoleTitle(Title,sizeof(Title));
+	hConWnd=FindWindow(NULL,Title);
+	if(hConWnd)
+		SetWindowPos(hConWnd,NULL,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER);
+	return 0;
+}
 void open_console()
 {
 	char title[MAX_PATH]={0};
@@ -79,26 +92,12 @@ void open_console()
 	consolecreated=TRUE;
 }
 const GLchar *vsh="\
-					 varying vec4 p;\
-					 void main(){\
-					 p=sin(gl_ModelViewMatrix[1]*1.0);\
-					 gl_Position=gl_Vertex;\
+	varying vec4 p;\
+	void main(){\
+	p=sin(gl_ModelViewMatrix[1]*1.0);\
+	gl_Position=gl_Vertex;\
 }";
-// an iterative function for colour
-const GLchar *fsh="\
-					 varying vec4 p;\
-					 void main(){\
-					 float r,t,j;\
-					 vec4 v=gl_FragCoord/40.0-1.0;\
-					 r=v.x*p.r;\
-					 for(int j=0;j<7;j++){\
-					 t=v.x+p.r*p.g;\
-					 v.x=t*t-v.y*v.y+r;\
-					 v.y=p.g*3.0*t*v.y+v.y;\
-					 }\
-					 /*gl_FragColor=vec4(mix(p,vec4(t),max(t,v.x)));*/\
-					 gl_FragColor=gl_FragCoord/100;\
-}";
+
 
 int gl_check_compile(int id)
 {
@@ -141,7 +140,6 @@ int load_frag_shader(GLuint id)
 			blen+=prelen;
 			buf=malloc(blen);
 			if(buf){
-				int result;
 				memset(buf,0,blen);
 				memcpy(buf,preamble,prelen);
 				fread(buf+prelen,1,len,f);
@@ -154,12 +152,34 @@ int load_frag_shader(GLuint id)
 		}
 		fclose(f);
 	}
-	else
+	else{
 		printf("cant open file %s\n",fname);
+		printf("loading sample instead\n");
+		{
+			char *buf;
+			int blen,prelen;
+			blen=strlen(sample1)+4;
+			prelen=strlen(preamble);
+			blen+=prelen;
+			buf=malloc(blen);
+			if(buf){
+				memset(buf,0,blen);
+				memcpy(buf,preamble,prelen);
+				strncpy(buf+prelen,sample1,blen-prelen);
+				buf[blen-1]=0;
+				glShaderSource(id, 1, &buf, NULL);
+				if(heditwin){
+					SetWindowText(GetDlgItem(heditwin,IDC_EDIT1),buf);
+				}
+				free(buf);
+			}
+
+		}
+	}
 	return 0;
 }
 
-int get_time()
+int get_time(float *time)
 {
 	static int init=FALSE;
 	static DWORD start;
@@ -169,13 +189,15 @@ int get_time()
 		init=TRUE;
 	}
 	delta=GetTickCount()-start;
+	if(time)
+		*time=(float)delta/(float)1000;
 	return delta/1000;
 }
 int set_vars(GLuint p)
 {
 	GLint i;
 	float f[4],time;
-	time=get_time();
+	get_time(&time);
 	if(p==0)
 		return 0;
 	i=glGetUniformLocation(p,"iResolution");
@@ -243,6 +265,7 @@ int set_vars(GLuint p)
 		if(GL_NO_ERROR!=glGetError())
 			printf("error\n");
 	}
+	return 0;
 }
 int load_call_table()
 {
@@ -346,6 +369,7 @@ int setupPixelFormat(HDC hDC)
 	pfd.dwFlags    = PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
 	SetPixelFormat(hDC,ChoosePixelFormat(hDC,&pfd),&pfd);
 	*/
+	return 0;
 }
 void perspectiveGL( GLdouble fovY, GLdouble aspect, GLdouble zNear, GLdouble zFar )
 {
@@ -365,9 +389,77 @@ void reshape(int w, int h)
 	glViewport(0,0,(GLsizei)w,(GLsizei)h);
 
 }
+int insert_preamble(HWND hedit,char *buf,int len)
+{
+	//static const char *_preamble="test";
+	char *pre=preamble;
+	int prelen=strlen(pre);
+	if(memcmp(buf,pre,prelen)!=0){
+		int start=0,end=0;
+		SendMessage(hedit,EM_GETSEL,&start,&end);
+		SendMessage(hedit,EM_SETSEL,0,0);
+		SendMessage(hedit,EM_REPLACESEL,FALSE,pre);
+		SendMessage(hedit,EM_SETSEL,start,end);
+	}
+	return TRUE;
+}
+WNDPROC orig_edit=0;
+int edit_busy=FALSE;
+
+LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
+{
+	switch(msg){
+	case WM_APP:
+		{
+			int maxlen=0x200000;
+			char *buf=malloc(maxlen);
+			edit_busy=TRUE;
+			if(buf){
+				HWND hparent=GetParent(hwnd);
+				GetWindowText(hwnd,buf,maxlen);
+				buf[maxlen-1]=0;
+				insert_preamble(hwnd,buf,maxlen);
+				glShaderSource(fragid, 1, &buf, NULL);
+				glCompileShader(fragid);
+				if(gl_check_compile(fragid)){
+					glAttachShader(progid,fragid);
+					glLinkProgram(progid);
+					set_vars(progid);
+					printf("compile success!\n");
+					SetWindowText(hparent,"Shader code");
+				}
+				else
+					SetWindowText(hparent,"code ERROR!");
+
+				free(buf);
+			}
+			edit_busy=FALSE;
+		}
+		break;
+	case WM_KEYDOWN:
+		switch(wparam){
+		case 'A':
+			if(GetKeyState(VK_CONTROL)&0x8000)
+				SendMessage(hwnd,EM_SETSEL,0,-1);
+			break;
+		case VK_F5:
+			{
+				HWND hparent=GetParent(hwnd);
+				SendMessage(GetDlgItem(hparent,IDC_PAUSE),BM_CLICK,0,0);
+				SetFocus(hwnd);
+			}
+			break;
+		}
+	}
+	return CallWindowProc(orig_edit,hwnd,msg,wparam,lparam); 
+}
+
 LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	switch(msg){
+	case WM_INITDIALOG:
+		orig_edit=SetWindowLong(GetDlgItem(hwnd,IDC_EDIT1),GWL_WNDPROC,subclass_edit);
+		break;
 	case WM_CLOSE:
 		ShowWindow(hwnd,SW_HIDE);
 		return 0;
@@ -376,26 +468,18 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		case IDC_EDIT1:
 			switch(HIWORD(wparam)){
 			case EN_CHANGE:
-				{
-					int maxlen=0x200000;
-					char *buf=malloc(maxlen);
-					if(buf){
-						GetWindowText(lparam,buf,maxlen);
-						buf[maxlen-1]=0;
-						glShaderSource(fragid, 1, &buf, NULL);
-						glCompileShader(fragid);
-						if(gl_check_compile(fragid)){
-							glAttachShader(progid,fragid);
-							glLinkProgram(progid);
-							set_vars(progid);
-							printf("compile success!\n");
-						}
-						free(buf);
-					}
-				}
+				if(!edit_busy)
+					PostMessage(GetDlgItem(hwnd,IDC_EDIT1),WM_APP,0,0);
 				break;
 			}
-			
+		case IDC_PAUSE:
+			if(IsDlgButtonChecked(hwnd,IDC_PAUSE))
+				pause=TRUE;
+			else
+				pause=FALSE;
+			break;
+		case IDCANCEL:
+			ShowWindow(hwnd,SW_HIDE);
 			break;
 		}
 		break;
@@ -406,7 +490,7 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			h=HIWORD(lparam);
 			SetWindowPos(GetDlgItem(hwnd,IDC_EDIT1),NULL,0,0,w,h-25,SWP_NOZORDER);
 			SetWindowPos(GetDlgItem(hwnd,IDOK),NULL,0,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
-			SetWindowPos(GetDlgItem(hwnd,IDCANCEL),NULL,100,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
+			SetWindowPos(GetDlgItem(hwnd,IDC_PAUSE),NULL,100,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
 		}
 		break;
 	}
@@ -424,6 +508,10 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
     case WM_CREATE:
 	case WM_INITDIALOG:
 		{
+			int sw,sh;
+			sw=GetSystemMetrics(SM_CXSCREEN);
+			sh=GetSystemMetrics(SM_CYSCREEN);
+
 			hDC=GetDC(hwnd);
 			if(hDC)
 				setupPixelFormat(hDC);
@@ -434,18 +522,19 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			}
 			heditwin=CreateDialog(ghinstance,MAKEINTRESOURCE(IDD_SHADER_EDIT),hwnd,WndEdit);
 			if(heditwin)
-				SetWindowPos(heditwin,HWND_TOP,640,0,640,480,SWP_SHOWWINDOW|SWP_NOZORDER);
+				SetWindowPos(heditwin,HWND_TOP,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW|SWP_NOZORDER);
 			set_shaders(&program,TRUE);
 
 			{
 			RECT rect;
-			SetWindowPos(hwnd,HWND_TOP,0,0,640,480,0);
+			SetWindowPos(hwnd,HWND_TOP,0,0,sw/2,sh/2,0);
 			GetClientRect(hwnd,&rect);
 			screenw=rect.right-rect.left;
 			screenh=rect.bottom-rect.top;
 			set_vars(program);
 			}
 			SetTimer(hwnd,1000,60,NULL);
+			move_console(0,sh/2);
 
 		}
         return 0;
@@ -465,7 +554,6 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		break;
 	case WM_SIZE:
 		{
-			RECT rect;
 			screenw=LOWORD(lparam);
 			screenh=HIWORD(lparam);
 			reshape(screenw,screenh);
@@ -476,12 +564,19 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	case WM_PAINT:
 		{
 			float f=0.1;
-			glRotatef(f,1,1,1);
-			glRecti(-1,-1,1,1);
-			if(hDC)
-				SwapBuffers(hDC);
+			if(pause){
+				;
+			}
+			else{
 
-			set_vars(program);
+				glRotatef(f,1,1,1);
+				glRecti(-1,-1,1,1);
+
+				if(hDC)
+					SwapBuffers(hDC);
+
+				set_vars(program);
+			}
 //			Sleep(1);
 //			InvalidateRect(hwnd,NULL,FALSE);
 //			printf(".");
@@ -517,6 +612,7 @@ int create_view(HINSTANCE hInstance)
 		MessageBox(NULL,"Could not create main dialog","ERROR",MB_ICONERROR|MB_OK);
 		exit(-1);
 	}
+	return 0;
 }
 int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,int iCmdShow)
 {
