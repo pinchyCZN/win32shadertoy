@@ -202,18 +202,20 @@ int set_vars(GLuint p)
 		return 0;
 	i=glGetUniformLocation(p,"iResolution");
 	if(i!=-1){
+		int e;
 		f[0]=screenw;
 		f[1]=screenh;
 		f[2]=0;
 		glProgramUniform3fv(p,i,1,&f);
-		if(GL_NO_ERROR!=glGetError())
-			printf("error\n");
+		e=glGetError();
+		if(GL_NO_ERROR!=e)
+			printf("error setting resolution of %i,%i error=0x%04X\n",screenw,screenh,e);
 	}
 	i=glGetUniformLocation(p,"iGlobalTime");
 	if(i!=-1){
 		glProgramUniform1f(p,i,time);
 		if(GL_NO_ERROR!=glGetError())
-			printf("error\n");
+			printf("error setting time\n");
 	}
 	i=glGetUniformLocation(p,"iChannelTime");
 	if(i!=-1){
@@ -224,7 +226,7 @@ int set_vars(GLuint p)
 		}
 		glProgramUniform1fv(p,i,4,flist);
 		if(GL_NO_ERROR!=glGetError())
-			printf("error\n");
+			printf("error setting channel time\n");
 	}
 	{
 		int j;
@@ -239,7 +241,7 @@ int set_vars(GLuint p)
 				flist[2]=0;
 				glProgramUniform3fv(p,i,1,flist);
 				if(GL_NO_ERROR!=glGetError())
-					printf("error\n");
+					printf("error setting chan rez %i\n",j);
 			}
 		}
 	}
@@ -247,12 +249,19 @@ int set_vars(GLuint p)
 	if(i!=-1){
 		float flist[4];
 		int j;
+		POINT pt;
+		GetCursorPos(&pt);
 		for(j=0;j<4;j++){
-			flist[j]=0;
+			if(j==0)
+				flist[j]=pt.x;
+			else if(j==1)
+				flist[j]=pt.y;
+			else
+				flist[j]=0;
 		}
 		glProgramUniform4fv(p,i,1,flist);
 		if(GL_NO_ERROR!=glGetError())
-			printf("error\n");
+			printf("error setting mouse\n");
 	}
 	i=glGetUniformLocation(p,"iDate");
 	if(i!=-1){
@@ -263,7 +272,7 @@ int set_vars(GLuint p)
 		}
 		glProgramUniform4fv(p,i,1,flist);
 		if(GL_NO_ERROR!=glGetError())
-			printf("error\n");
+			printf("error setting date\n");
 	}
 	return 0;
 }
@@ -545,6 +554,11 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		case VK_ESCAPE:
 			PostQuitMessage(0);
 			EndDialog(hwnd,0);
+			break;
+		case VK_F5:
+			SetActiveWindow(heditwin);
+			SendMessage(GetDlgItem(heditwin,IDC_PAUSE),BM_CLICK,0,0);
+			SetFocus(hwnd);
 			break;
 		case VK_F1:
 			if(heditwin)
