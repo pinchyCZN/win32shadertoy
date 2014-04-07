@@ -18,6 +18,7 @@ static PFNGLGETSHADERIVPROC glGetShaderiv;
 static PFNGLGETSHADERINFOLOGPROC glGetShaderInfoLog;
 
 static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
+static PFNGLPROGRAMUNIFORM1IPROC glProgramUniform1i;
 static PFNGLPROGRAMUNIFORM1FPROC glProgramUniform1f;
 static PFNGLPROGRAMUNIFORM1FVPROC glProgramUniform1fv;
 static PFNGLPROGRAMUNIFORM3FPROC glProgramUniform3f;
@@ -35,6 +36,7 @@ HWND heditwin=0;
 HINSTANCE ghinstance=0;
 int fragid=0,progid=0;
 int load_preamble=TRUE;
+int texture1=0,texture2=0,texture3=0,texture4=0;
 
 char *preamble= "uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
 "uniform float     iGlobalTime;           // shader playback time (in seconds)\r\n"
@@ -203,36 +205,36 @@ int get_time(float *time)
 }
 int set_vars(GLuint p)
 {
-	GLint i;
+	GLint loc;
 	float f[4],time;
 	get_time(&time);
 	if(p==0)
 		return 0;
-	i=glGetUniformLocation(p,"iResolution");
-	if(i!=-1){
+	loc=glGetUniformLocation(p,"iResolution");
+	if(loc!=-1){
 		int e;
 		f[0]=screenw;
 		f[1]=screenh;
 		f[2]=0;
-		glProgramUniform3fv(p,i,1,&f);
+		glProgramUniform3fv(p,loc,1,&f);
 		e=glGetError();
 		if(GL_NO_ERROR!=e)
 			printf("error setting resolution of %i,%i error=0x%04X\n",screenw,screenh,e);
 	}
-	i=glGetUniformLocation(p,"iGlobalTime");
-	if(i!=-1){
-		glProgramUniform1f(p,i,time);
+	loc=glGetUniformLocation(p,"iGlobalTime");
+	if(loc!=-1){
+		glProgramUniform1f(p,loc,time);
 		if(GL_NO_ERROR!=glGetError())
 			printf("error setting time\n");
 	}
-	i=glGetUniformLocation(p,"iChannelTime");
-	if(i!=-1){
+	loc=glGetUniformLocation(p,"iChannelTime");
+	if(loc!=-1){
 		float flist[4];
 		int j;
 		for(j=0;j<4;j++){
 			flist[j]=time;
 		}
-		glProgramUniform1fv(p,i,4,flist);
+		glProgramUniform1fv(p,loc,4,flist);
 		if(GL_NO_ERROR!=glGetError())
 			printf("error setting channel time\n");
 	}
@@ -241,20 +243,28 @@ int set_vars(GLuint p)
 		char str[40];
 		for(j=0;j<4;j++){
 			sprintf(str,"iChannelResolution[%i]",j);
-			i=glGetUniformLocation(p,str);
-			if(i!=-1){
+			loc=glGetUniformLocation(p,str);
+			if(loc!=-1){
 				float flist[3];
-				flist[0]=screenw;
-				flist[1]=screenh;
+				flist[0]=64;
+				flist[1]=64;
 				flist[2]=0;
-				glProgramUniform3fv(p,i,1,flist);
+				glProgramUniform3fv(p,loc,1,flist);
 				if(GL_NO_ERROR!=glGetError())
 					printf("error setting chan rez %i\n",j);
 			}
+			sprintf(str,"iChannel%i",j);
+			loc=glGetUniformLocation(p,str);
+			if(loc!=-1){
+				int tex=0;
+				glProgramUniform1i(p,loc,0);
+				if(GL_NO_ERROR!=glGetError())
+					printf("error setting channel texture %i\n",j);
+			}
 		}
 	}
-	i=glGetUniformLocation(p,"iMouse");
-	if(i!=-1){
+	loc=glGetUniformLocation(p,"iMouse");
+	if(loc!=-1){
 		float flist[4];
 		int j;
 		POINT pt;
@@ -268,18 +278,18 @@ int set_vars(GLuint p)
 			else
 				flist[j]=0;
 		}
-		glProgramUniform4fv(p,i,1,flist);
+		glProgramUniform4fv(p,loc,1,flist);
 		if(GL_NO_ERROR!=glGetError())
 			printf("error setting mouse\n");
 	}
-	i=glGetUniformLocation(p,"iDate");
-	if(i!=-1){
+	loc=glGetUniformLocation(p,"iDate");
+	if(loc!=-1){
 		float flist[4];
 		int j;
 		for(j=0;j<4;j++){
 			flist[j]=0;
 		}
-		glProgramUniform4fv(p,i,1,flist);
+		glProgramUniform4fv(p,loc,1,flist);
 		if(GL_NO_ERROR!=glGetError())
 			printf("error setting date\n");
 	}
@@ -303,6 +313,7 @@ int load_call_table()
 	glProgramUniform3f=wglGetProcAddress("glProgramUniform3f");
 	glProgramUniform1fv=wglGetProcAddress("glProgramUniform1fv");
 	glProgramUniform1f=wglGetProcAddress("glProgramUniform1f");
+	glProgramUniform1i=wglGetProcAddress("glProgramUniform1i");
 
 	glGetUniformfv=wglGetProcAddress("glGetUniformfv");
 	glGetUniformiv=wglGetProcAddress("glGetUniformfv");
@@ -406,6 +417,32 @@ void reshape(int w, int h)
 	glLoadIdentity();
 	glViewport(0,0,(GLsizei)w,(GLsizei)h);
 
+}
+int load_textures()
+{
+	int tn=0;
+	glGenTextures(1,&tn);
+	if(tn!=0){
+		int i;
+		int w,h;
+		w=64;h=64;
+		glBindTexture(GL_TEXTURE_2D,tn);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+		glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_DECAL);
+		glTexImage2D(GL_TEXTURE_2D,0,3,w,h,0,GL_RGB,GL_UNSIGNED_BYTE,texture_sample1);
+		for(i=0;i<4;i++){
+			switch(i){
+				case 0:texture1=tn;break;
+				case 1:texture2=tn;break;
+				case 2:texture3=tn;break;
+				case 3:texture4=tn;break;
+			}
+		}
+	}
+	return TRUE;
 }
 int insert_preamble(HWND hedit,char *buf,int len)
 {
@@ -672,7 +709,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			if(heditwin)
 				SetWindowPos(heditwin,HWND_TOP,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW|SWP_NOZORDER);
 			set_shaders(&program,TRUE);
-
+			load_textures();
 			{
 			RECT rect;
 			SetWindowPos(hwnd,HWND_TOP,0,0,sw/2,sh/2,0);
