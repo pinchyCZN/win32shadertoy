@@ -121,7 +121,27 @@ int gl_check_compile(int id)
 	}
 	return result;
 }
-
+int load_shader_string(int id,char *str,HWND hedit)
+{
+	char *buf;
+	int blen,prelen;
+	blen=strlen(str)+4;
+	prelen=strlen(preamble);
+	blen+=prelen;
+	buf=malloc(blen);
+	if(buf){
+		memset(buf,0,blen);
+		memcpy(buf,preamble,prelen);
+		strncpy(buf+prelen,str,blen-prelen);
+		buf[blen-1]=0;
+		glShaderSource(id, 1, &buf, NULL);
+		if(hedit){
+			SetWindowText(hedit,buf);
+		}
+		free(buf);
+	}
+	return TRUE;
+}
 int load_frag_shader(GLuint id)
 {
 	FILE *f;
@@ -129,26 +149,21 @@ int load_frag_shader(GLuint id)
 	f=fopen(fname,"rb");
 	if(f){
 		int len;
+		printf("loading file %s\n",fname);
 		fseek(f,0,SEEK_END);
 		len=ftell(f);
 		fseek(f,0,SEEK_SET);
 		if(len>0){
 			char *buf;
-			int blen,prelen;
-			blen=len+4;
-			prelen=strlen(preamble);
-			blen+=prelen;
+			int blen=len+4;
 			buf=malloc(blen);
 			if(buf){
 				memset(buf,0,blen);
-				memcpy(buf,preamble,prelen);
-				fread(buf+prelen,1,len,f);
-				glShaderSource(id, 1, &buf, NULL);
-				if(heditwin){
-					SetWindowText(GetDlgItem(heditwin,IDC_EDIT1),buf);
-				}
+				fread(buf,1,len,f);
+				load_shader_string(id,buf,GetDlgItem(heditwin,IDC_EDIT1));
 				free(buf);
 			}
+
 		}
 		fclose(f);
 	}
@@ -156,24 +171,14 @@ int load_frag_shader(GLuint id)
 		printf("cant open file %s\n",fname);
 		printf("loading sample instead\n");
 		{
-			char *buf;
+			char *buf,*str;
 			int blen,prelen;
-			blen=strlen(sample1)+4;
-			prelen=strlen(preamble);
-			blen+=prelen;
-			buf=malloc(blen);
-			if(buf){
-				memset(buf,0,blen);
-				memcpy(buf,preamble,prelen);
-				strncpy(buf+prelen,sample1,blen-prelen);
-				buf[blen-1]=0;
-				glShaderSource(id, 1, &buf, NULL);
-				if(heditwin){
-					SetWindowText(GetDlgItem(heditwin,IDC_EDIT1),buf);
-				}
-				free(buf);
-			}
-
+			srand(GetTickCount());
+			if(rand()&1)
+				str=sample2;
+			else
+				str=sample1;
+			load_shader_string(id,str,GetDlgItem(heditwin,IDC_EDIT1));
 		}
 	}
 	return 0;
@@ -415,6 +420,16 @@ int insert_preamble(HWND hedit,char *buf,int len)
 WNDPROC orig_edit=0;
 int edit_busy=FALSE;
 
+int update_status(HWND hedit,HWND hstatus)
+{
+	int start=0,end=0,line;
+	char str[80];
+	SendMessage(hedit,EM_GETSEL,&start,&end);
+	line=SendMessage(hedit,EM_LINEFROMCHAR,start,0);
+	sprintf(str,"%i",line+1);
+	SetWindowText(hstatus,str);
+	return TRUE;
+}
 LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	switch(msg){
@@ -445,6 +460,12 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			edit_busy=FALSE;
 		}
 		break;
+	case WM_LBUTTONUP:
+	case WM_MBUTTONUP:
+	case WM_RBUTTONUP:
+	case WM_KEYUP:
+		update_status(hwnd,GetDlgItem(GetParent(hwnd),IDC_STATUS));
+		break;
 	case WM_KEYDOWN:
 		switch(wparam){
 		case 'A':
@@ -459,8 +480,74 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			}
 			break;
 		}
+		break;
 	}
 	return CallWindowProc(orig_edit,hwnd,msg,wparam,lparam); 
+}
+struct FONT_NAME{
+	int font_num;
+	char *font_name;
+};
+struct FONT_NAME font_names[7]={
+	{OEM_FIXED_FONT,"OEM_FIXED_FONT"},
+	{ANSI_FIXED_FONT,"ANSI_FIXED_FONT"},
+	{ANSI_VAR_FONT,"ANSI_VAR_FONT"},
+	{SYSTEM_FONT,"SYSTEM_FONT"},
+	{DEVICE_DEFAULT_FONT,"DEVICE_DEFAULT_FONT"},
+	{SYSTEM_FIXED_FONT,"SYSTEM_FIXED_FONT"},
+	{DEFAULT_GUI_FONT,"DEFAULT_GUI_FONT"}
+};
+int compile(HWND hwin)
+{
+	int result=FALSE;
+	glCompileShader(fragid);
+	if(gl_check_compile(fragid)){
+		glAttachShader(progid,fragid);
+		glLinkProgram(progid);
+		set_vars(progid);
+		printf("compile success!\n");
+		SetWindowText(hwin,"Shader code");
+		result=TRUE;
+	}
+	else
+		SetWindowText(hwin,"code ERROR!");
+	return result;
+}
+LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
+{
+	static HWND hedit=0;
+	switch(msg){
+	case WM_INITDIALOG:
+		{
+			int i;
+			HFONT hfont;
+			LOGFONT lf={0};
+			hedit=lparam;
+			for(i=0;i<sizeof(font_names)/sizeof(struct FONT_NAME);i++)
+				SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,font_names[i].font_name);
+			hfont=SendMessage(hedit,WM_GETFONT,0,0);
+			GetObject(hfont,sizeof(LOGFONT),&lf);
+			i=SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,lf.lfFaceName);
+			SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
+
+		}
+		break;
+	case WM_COMMAND:
+		switch(LOWORD(wparam)){
+		case IDC_SAMPLE1:
+			load_shader_string(progid,sample1,GetDlgItem(heditwin,IDC_EDIT1));
+			compile(heditwin);
+			break;
+		case IDC_SAMPLE2:
+			load_shader_string(progid,sample2,GetDlgItem(heditwin,IDC_EDIT1));
+			compile(heditwin);
+			break;
+		}
+		break;
+	case WM_CLOSE:
+		EndDialog(hwnd,0);
+	}
+	return 0;
 }
 
 LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
@@ -490,6 +577,9 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		case IDCANCEL:
 			ShowWindow(hwnd,SW_HIDE);
 			break;
+		case IDC_SETTINGS:
+			DialogBoxParam(ghinstance,MAKEINTRESOURCE(IDD_SETTINGS),hwnd,settings_proc,GetDlgItem(hwnd,IDC_EDIT1));
+			break;
 		}
 		break;
 	case WM_SIZE:
@@ -498,8 +588,16 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			w=LOWORD(lparam);
 			h=HIWORD(lparam);
 			SetWindowPos(GetDlgItem(hwnd,IDC_EDIT1),NULL,0,0,w,h-25,SWP_NOZORDER);
-			SetWindowPos(GetDlgItem(hwnd,IDOK),NULL,0,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
+			SetWindowPos(GetDlgItem(hwnd,IDC_SETTINGS),NULL,0,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
 			SetWindowPos(GetDlgItem(hwnd,IDC_PAUSE),NULL,100,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
+			{
+				int cx,cy;
+				cx=w-200;
+				if(cx<0)
+					cx=10;
+				cy=25;
+				SetWindowPos(GetDlgItem(hwnd,IDC_STATUS),NULL,200,h-25,cx,cy,SWP_NOZORDER);
+			}
 		}
 		break;
 	}
