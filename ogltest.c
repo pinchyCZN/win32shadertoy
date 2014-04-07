@@ -34,6 +34,7 @@ HWND hview=0;
 HWND heditwin=0;
 HINSTANCE ghinstance=0;
 int fragid=0,progid=0;
+int load_preamble=TRUE;
 
 char *preamble= "uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
 "uniform float     iGlobalTime;           // shader playback time (in seconds)\r\n"
@@ -123,15 +124,17 @@ int gl_check_compile(int id)
 }
 int load_shader_string(int id,char *str,HWND hedit)
 {
-	char *buf;
+	char *buf,*pre="";
 	int blen,prelen;
 	blen=strlen(str)+4;
-	prelen=strlen(preamble);
+	if(load_preamble)
+		pre=preamble;
+	prelen=strlen(pre);
 	blen+=prelen;
 	buf=malloc(blen);
 	if(buf){
 		memset(buf,0,blen);
-		memcpy(buf,preamble,prelen);
+		memcpy(buf,pre,prelen);
 		strncpy(buf+prelen,str,blen-prelen);
 		buf[blen-1]=0;
 		glShaderSource(id, 1, &buf, NULL);
@@ -256,11 +259,12 @@ int set_vars(GLuint p)
 		int j;
 		POINT pt;
 		GetCursorPos(&pt);
+		MapWindowPoints(NULL,hview,&pt,1);
 		for(j=0;j<4;j++){
 			if(j==0)
-				flist[j]=pt.x;
+				flist[j]=pt.x;//-(screenw/2);
 			else if(j==1)
-				flist[j]=pt.y;
+				flist[j]=pt.y;//-(screenh/2);
 			else
 				flist[j]=0;
 		}
@@ -442,7 +446,8 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				HWND hparent=GetParent(hwnd);
 				GetWindowText(hwnd,buf,maxlen);
 				buf[maxlen-1]=0;
-				insert_preamble(hwnd,buf,maxlen);
+				if(load_preamble)
+					insert_preamble(hwnd,buf,maxlen);
 				glShaderSource(fragid, 1, &buf, NULL);
 				glCompileShader(fragid);
 				if(gl_check_compile(fragid)){
@@ -497,6 +502,16 @@ struct FONT_NAME font_names[7]={
 	{SYSTEM_FIXED_FONT,"SYSTEM_FIXED_FONT"},
 	{DEFAULT_GUI_FONT,"DEFAULT_GUI_FONT"}
 };
+int fontname_to_int(char *name)
+{
+	int i;
+	for(i=0;i<sizeof(font_names)/sizeof(struct FONT_NAME);i++){
+		if(stricmp(name,font_names[i].font_name)==0){
+			return font_names[i].font_num;
+		}
+	}
+	return DEFAULT_GUI_FONT;
+}
 int compile(HWND hwin)
 {
 	int result=FALSE;
@@ -529,18 +544,44 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			GetObject(hfont,sizeof(LOGFONT),&lf);
 			i=SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,lf.lfFaceName);
 			SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
+			if(load_preamble)
+				SendDlgItemMessage(hwnd,IDC_LOAD_PREAMBLE,BM_SETCHECK,BST_CHECKED,0);
 
 		}
 		break;
 	case WM_COMMAND:
 		switch(LOWORD(wparam)){
+		case IDC_FONTS:
+			if(HIWORD(wparam)==CBN_SELENDOK){
+				int font;
+				char str[80]={0};
+				GetDlgItemText(hwnd,IDC_FONTS,str,sizeof(str));
+				font=fontname_to_int(str);
+				SendDlgItemMessage(heditwin,IDC_EDIT1,WM_SETFONT,GetStockObject(font),0);
+				InvalidateRect(GetDlgItem(heditwin,IDC_EDIT1),NULL,TRUE);
+			}
+			break;
+		case IDC_LOAD_PREAMBLE:
+			if(BST_CHECKED==SendMessage(lparam,BM_GETCHECK,0,0))
+				load_preamble=TRUE;
+			else
+				load_preamble=FALSE;
+			break;
 		case IDC_SAMPLE1:
-			load_shader_string(progid,sample1,GetDlgItem(heditwin,IDC_EDIT1));
-			compile(heditwin);
+			if(HIWORD(wparam)==BN_CLICKED){
+				load_shader_string(fragid,sample1,GetDlgItem(heditwin,IDC_EDIT1));
+				compile(heditwin);
+			}
 			break;
 		case IDC_SAMPLE2:
-			load_shader_string(progid,sample2,GetDlgItem(heditwin,IDC_EDIT1));
-			compile(heditwin);
+			if(HIWORD(wparam)==BN_CLICKED){
+				load_shader_string(fragid,sample2,GetDlgItem(heditwin,IDC_EDIT1));
+				compile(heditwin);
+			}
+			break;
+		case IDCANCEL:
+		case IDOK:
+			EndDialog(hwnd,0);
 			break;
 		}
 		break;
