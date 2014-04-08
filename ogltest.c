@@ -31,12 +31,14 @@ static PFNGLGETUNIFORMIVPROC glGetUniformiv;
 int pause=FALSE;
 int screenw=1360;
 int screenh=768;
+int clickx=0,clicky=0;
 HWND hview=0;
 HWND heditwin=0;
 HINSTANCE ghinstance=0;
 int fragid=0,progid=0;
 int load_preamble=TRUE;
 int texture1=0,texture2=0,texture3=0,texture4=0;
+static int sample=1;
 
 char *preamble= "uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
 "uniform float     iGlobalTime;           // shader playback time (in seconds)\r\n"
@@ -177,12 +179,17 @@ int load_frag_shader(GLuint id)
 		printf("loading sample instead\n");
 		{
 			char *buf,*str;
-			int blen,prelen;
+			int blen,prelen,rnd;
 			srand(GetTickCount());
-			if(rand()&1)
+			rnd=rand()&1;
+			if(rnd){
 				str=sample2;
-			else
+				sample=3;
+			}
+			else{
 				str=sample1;
+				sample=2;
+			}
 			load_shader_string(id,str,GetDlgItem(heditwin,IDC_EDIT1));
 		}
 	}
@@ -257,7 +264,7 @@ int set_vars(GLuint p)
 			loc=glGetUniformLocation(p,str);
 			if(loc!=-1){
 				int tex=0;
-				glProgramUniform1i(p,loc,0);
+				glProgramUniform1i(p,loc,0); //texture unit 0
 				if(GL_NO_ERROR!=glGetError())
 					printf("error setting channel texture %i\n",j);
 			}
@@ -266,18 +273,13 @@ int set_vars(GLuint p)
 	loc=glGetUniformLocation(p,"iMouse");
 	if(loc!=-1){
 		float flist[4];
-		int j;
 		POINT pt;
 		GetCursorPos(&pt);
 		MapWindowPoints(NULL,hview,&pt,1);
-		for(j=0;j<4;j++){
-			if(j==0)
-				flist[j]=pt.x;//-(screenw/2);
-			else if(j==1)
-				flist[j]=pt.y;//-(screenh/2);
-			else
-				flist[j]=0;
-		}
+		flist[0]=pt.x;
+		flist[1]=screenh-pt.y;
+		flist[2]=clickx;
+		flist[3]=clicky;
 		glProgramUniform4fv(p,loc,1,flist);
 		if(GL_NO_ERROR!=glGetError())
 			printf("error setting mouse\n");
@@ -285,10 +287,12 @@ int set_vars(GLuint p)
 	loc=glGetUniformLocation(p,"iDate");
 	if(loc!=-1){
 		float flist[4];
-		int j;
-		for(j=0;j<4;j++){
-			flist[j]=0;
-		}
+		SYSTEMTIME time;
+		GetLocalTime(&time);
+		flist[0]=time.wYear;
+		flist[1]=time.wMonth;
+		flist[2]=time.wDay;
+		flist[3]=time.wSecond+time.wMinute*60+time.wHour*60*60;
 		glProgramUniform4fv(p,loc,1,flist);
 		if(GL_NO_ERROR!=glGetError())
 			printf("error setting date\n");
@@ -583,6 +587,11 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
 			if(load_preamble)
 				SendDlgItemMessage(hwnd,IDC_LOAD_PREAMBLE,BM_SETCHECK,BST_CHECKED,0);
+			{
+				char str[40];
+				sprintf(str,"load sample %i",sample);
+				SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,str);
+			}
 
 		}
 		break;
@@ -604,16 +613,24 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			else
 				load_preamble=FALSE;
 			break;
-		case IDC_SAMPLE1:
+		case IDC_LOAD_SAMPLE:
 			if(HIWORD(wparam)==BN_CLICKED){
-				load_shader_string(fragid,sample1,GetDlgItem(heditwin,IDC_EDIT1));
+				char *str=sample1;
+				switch(sample){
+					default:case 1:str=sample1;break;
+					case 2:str=sample2;break;
+					case 3:str=sample3;break;
+				}
+				load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
 				compile(heditwin);
-			}
-			break;
-		case IDC_SAMPLE2:
-			if(HIWORD(wparam)==BN_CLICKED){
-				load_shader_string(fragid,sample2,GetDlgItem(heditwin,IDC_EDIT1));
-				compile(heditwin);
+				sample++;
+				if(sample>3)
+					sample=1;
+				{
+					char tmp[40];
+					sprintf(tmp,"load sample %i",sample);
+					SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,tmp);
+				}
 			}
 			break;
 		case IDCANCEL:
@@ -724,6 +741,10 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		}
         return 0;
 	case WM_COMMAND:
+		break;
+	case WM_LBUTTONDOWN:
+		clickx=LOWORD(lparam);
+		clicky=screenh-HIWORD(lparam);
 		break;
 	case WM_KEYDOWN:
 		switch(wparam){
