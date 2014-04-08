@@ -5,7 +5,9 @@
 #include "resource.h"
 #include "glext.h"
 #include "sample.h"
+LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
 
+extern char tex00_512x512_RGB[];
 static PFNGLCREATEPROGRAMPROC glCreateProgram;
 static PFNGLSHADERSOURCEPROC glShaderSource;
 static PFNGLCOMPILESHADERPROC glCompileShader;
@@ -38,7 +40,7 @@ HINSTANCE ghinstance=0;
 int fragid=0,progid=0;
 int load_preamble=TRUE;
 int texture1=0,texture2=0,texture3=0,texture4=0;
-static int sample=1;
+int src_sample=1;
 
 char *preamble= "uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
 "uniform float     iGlobalTime;           // shader playback time (in seconds)\r\n"
@@ -184,12 +186,14 @@ int load_frag_shader(GLuint id)
 			rnd=rand()&1;
 			if(rnd){
 				str=sample2;
-				sample=3;
+				src_sample=3;
 			}
 			else{
 				str=sample1;
-				sample=2;
+				src_sample=2;
 			}
+			str=sample3;
+			src_sample=1;
 			load_shader_string(id,str,GetDlgItem(heditwin,IDC_EDIT1));
 		}
 	}
@@ -429,14 +433,14 @@ int load_textures()
 	if(tn!=0){
 		int i;
 		int w,h;
-		w=64;h=64;
+		w=512;h=512;
 		glBindTexture(GL_TEXTURE_2D,tn);
 		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
 		glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_DECAL);
-		glTexImage2D(GL_TEXTURE_2D,0,3,w,h,0,GL_RGB,GL_UNSIGNED_BYTE,texture_sample1);
+		glTexImage2D(GL_TEXTURE_2D,0,3,w,h,0,GL_RGB,GL_UNSIGNED_BYTE,tex00_512x512_RGB);
 		for(i=0;i<4;i++){
 			switch(i){
 				case 0:texture1=tn;break;
@@ -530,29 +534,7 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	}
 	return CallWindowProc(orig_edit,hwnd,msg,wparam,lparam); 
 }
-struct FONT_NAME{
-	int font_num;
-	char *font_name;
-};
-struct FONT_NAME font_names[7]={
-	{OEM_FIXED_FONT,"OEM_FIXED_FONT"},
-	{ANSI_FIXED_FONT,"ANSI_FIXED_FONT"},
-	{ANSI_VAR_FONT,"ANSI_VAR_FONT"},
-	{SYSTEM_FONT,"SYSTEM_FONT"},
-	{DEVICE_DEFAULT_FONT,"DEVICE_DEFAULT_FONT"},
-	{SYSTEM_FIXED_FONT,"SYSTEM_FIXED_FONT"},
-	{DEFAULT_GUI_FONT,"DEFAULT_GUI_FONT"}
-};
-int fontname_to_int(char *name)
-{
-	int i;
-	for(i=0;i<sizeof(font_names)/sizeof(struct FONT_NAME);i++){
-		if(stricmp(name,font_names[i].font_name)==0){
-			return font_names[i].font_num;
-		}
-	}
-	return DEFAULT_GUI_FONT;
-}
+
 int compile(HWND hwin)
 {
 	int result=FALSE;
@@ -569,81 +551,8 @@ int compile(HWND hwin)
 		SetWindowText(hwin,"code ERROR!");
 	return result;
 }
-LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
-{
-	static HWND hedit=0;
-	switch(msg){
-	case WM_INITDIALOG:
-		{
-			int i;
-			HFONT hfont;
-			LOGFONT lf={0};
-			hedit=lparam;
-			for(i=0;i<sizeof(font_names)/sizeof(struct FONT_NAME);i++)
-				SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,font_names[i].font_name);
-			hfont=SendMessage(hedit,WM_GETFONT,0,0);
-			GetObject(hfont,sizeof(LOGFONT),&lf);
-			i=SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,lf.lfFaceName);
-			SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
-			if(load_preamble)
-				SendDlgItemMessage(hwnd,IDC_LOAD_PREAMBLE,BM_SETCHECK,BST_CHECKED,0);
-			{
-				char str[40];
-				sprintf(str,"load sample %i",sample);
-				SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,str);
-			}
 
-		}
-		break;
-	case WM_COMMAND:
-		switch(LOWORD(wparam)){
-		case IDC_FONTS:
-			if(HIWORD(wparam)==CBN_SELENDOK){
-				int font;
-				char str[80]={0};
-				GetDlgItemText(hwnd,IDC_FONTS,str,sizeof(str));
-				font=fontname_to_int(str);
-				SendDlgItemMessage(heditwin,IDC_EDIT1,WM_SETFONT,GetStockObject(font),0);
-				InvalidateRect(GetDlgItem(heditwin,IDC_EDIT1),NULL,TRUE);
-			}
-			break;
-		case IDC_LOAD_PREAMBLE:
-			if(BST_CHECKED==SendMessage(lparam,BM_GETCHECK,0,0))
-				load_preamble=TRUE;
-			else
-				load_preamble=FALSE;
-			break;
-		case IDC_LOAD_SAMPLE:
-			if(HIWORD(wparam)==BN_CLICKED){
-				char *str=sample1;
-				switch(sample){
-					default:case 1:str=sample1;break;
-					case 2:str=sample2;break;
-					case 3:str=sample3;break;
-				}
-				load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
-				compile(heditwin);
-				sample++;
-				if(sample>3)
-					sample=1;
-				{
-					char tmp[40];
-					sprintf(tmp,"load sample %i",sample);
-					SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,tmp);
-				}
-			}
-			break;
-		case IDCANCEL:
-		case IDOK:
-			EndDialog(hwnd,0);
-			break;
-		}
-		break;
-	case WM_CLOSE:
-		EndDialog(hwnd,0);
-	}
-	return 0;
-}
+
 
 LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
