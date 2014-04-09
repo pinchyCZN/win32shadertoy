@@ -121,6 +121,8 @@ SOURCE=.\textures.asm
 
 !IF  "$(CFG)" == "win32shadertoy - Win32 Release"
 
+# PROP Ignore_Default_Tool 1
+
 !ELSEIF  "$(CFG)" == "win32shadertoy - Win32 Debug"
 
 # PROP Ignore_Default_Tool 1

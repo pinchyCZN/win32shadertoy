@@ -7,7 +7,7 @@
 #include "sample.h"
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
 
-extern char tex00_512x512_RGB[];
+extern unsigned char tex00_512x512_RGB[];
 static PFNGLCREATEPROGRAMPROC glCreateProgram;
 static PFNGLSHADERSOURCEPROC glShaderSource;
 static PFNGLCOMPILESHADERPROC glCompileShader;

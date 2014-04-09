@@ -21,3 +21,8 @@ incbin ".\textures\tex03_512x512_RGB.bin"
 global _tex04_512x512_RGB
 _tex04_512x512_RGB:
 incbin ".\textures\tex04_512x512_RGB.bin"
+
+global _tex11_64x64_RGBA
+_tex11_64x64_RGBA:
+incbin ".\textures\tex11_64x64_RGBA.bin"
+

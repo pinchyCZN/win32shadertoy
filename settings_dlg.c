@@ -7,6 +7,10 @@ extern int src_sample;
 extern const char *sample1,*sample2,*sample3;
 extern HINSTANCE ghinstance;
 extern HWND heditwin;
+extern unsigned char tex00_512x512_RGB[];
+extern unsigned char tex02_512x512_RGB[];
+extern unsigned char tex11_64x64_RGBA[];
+
 
 struct FONT_NAME{
 	int font_num;
@@ -34,61 +38,74 @@ int fontname_to_int(char *name)
 
 LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
-	static HBITMAP hbit=0;
 	static char data[64*64*3];
 	switch(msg){
 	case WM_INITDIALOG:
-		if(hbit==0){
-			{
-				int i;
-				for(i=0;i<64*64*3;i++)
-					data[i]=rand();
+		{
+			int i,j,id=IDC_BUTTON1+1;
+			int ycaption=GetSystemMetrics(SM_CYCAPTION);
+			for(i=0;i<4;i++){
+				for(j=0;j<4;j++){
+					HWND h;
+					h=CreateWindow("BUTTON","BUTTON",WS_CHILD|WS_VISIBLE|BS_OWNERDRAW|BS_CHECKBOX|BS_PUSHLIKE,4+i*(64+4),4+j*(64+4),64,64,hwnd,id,ghinstance,NULL);
+					id++;
+				}
 			}
-			hbit=CreateBitmap(64,64,1,24,data);
+			ShowWindow(GetDlgItem(hwnd,IDC_BUTTON1),SW_HIDE);
+			SetWindowPos(hwnd,NULL,0,0,4*2+(64+4)*4,ycaption+4*2+(64+4)*4,SWP_NOMOVE|SWP_NOZORDER);
 		}
 		break;
 	case WM_DRAWITEM:
 		{
-		LPDRAWITEMSTRUCT lpDIS=lparam;
-		HDC hDC=lpDIS->hDC;
-		RECT rect=lpDIS->rcItem;
-	
-		if(hbit){
-			RECT rcImage;
-			BITMAP bm;
+			LPDRAWITEMSTRUCT lpDIS=lparam;
+			BITMAPINFO bmi;
 			HDC hdc;
-			HBITMAP hold;
-			LONG cxBitmap, cyBitmap;
-			LONG image_width,image_height;
-			if ( GetObject(hbit, sizeof(bm), &bm) ) {
-				cxBitmap = bm.bmWidth;
-				cyBitmap = bm.bmHeight;
+			int flags;
+			memset(&bmi,0,sizeof(bmi));
+			bmi.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biBitCount=24;
+			bmi.bmiHeader.biHeight=64;
+			bmi.bmiHeader.biWidth=64;
+			bmi.bmiHeader.biPlanes=1;
+			bmi.bmiHeader.biCompression=BI_RGB;
+			bmi.bmiHeader.biSizeImage = ((bmi.bmiHeader.biWidth * 32 +31)& ~31) /8 * bmi.bmiHeader.biHeight;
+		{
+			int x,y;
+			for(x=0;x<64;x++){
+				for(y=0;y<64;y++){
+					int delta;
+					for(delta=0;delta<3;delta++){
+						int i,j,c=0;
+						int flip;
+						for(i=0;i<8;i++){
+							for(j=0;j<8;j++){
+								c+=tex02_512x512_RGB[2-delta+i*3+j*3*512+x*8*3+y*3*512*8];
+							}
+						}
+						flip=(64*3*63);
+						data[delta+x*3+flip-y*64*3]=c/64; //tex00_512x512_RGB[index+(2-p)];
+					}
+				}
 			}
-			
-			// Center image horizontally  
-			CopyRect(&rcImage, &rect);
-			image_width = rcImage.right - rcImage.left;
-			image_height = rcImage.bottom - rcImage.top;
-			rcImage.left = (image_width - cxBitmap)/2;
-			rcImage.top = (image_height - cyBitmap)/2;
-			hdc=CreateCompatibleDC(lpDIS->hDC);
-			hold=SelectObject(hdc,hbit);
-			StretchBlt(
-				lpDIS->hDC, // destination DC 
-				lpDIS->rcItem.left, // x upper left 
-				lpDIS->rcItem.top, // y upper left 
-				lpDIS->rcItem.right - lpDIS->rcItem.left, 
-				lpDIS->rcItem.bottom - lpDIS->rcItem.top, 
-				hdc, // source device context 
-				0, 0, // x and y upper left 
-				64, // source bitmap width 
-				64, // source bitmap height 
-				SRCCOPY); // raster operation
-
-			SelectObject(hdc,hold);
-			if(hdc)
-				 DeleteDC(hdc);
 		}
+			hdc=lpDIS->hDC;
+			SetDIBitsToDevice(
+				hdc,
+				lpDIS->rcItem.left,
+				lpDIS->rcItem.top,
+				lpDIS->rcItem.right - lpDIS->rcItem.left,
+				lpDIS->rcItem.bottom - lpDIS->rcItem.top,
+				0,0,
+				0,64,
+				data,
+				&bmi,
+				DIB_RGB_COLORS);
+			if(lpDIS->itemState&ODS_SELECTED)
+				flags=EDGE_SUNKEN;
+			else
+				flags=EDGE_RAISED;
+			DrawEdge(hdc,&lpDIS->rcItem,flags,BF_RECT);
+
 		}
 		break;
 	case WM_COMMAND:
