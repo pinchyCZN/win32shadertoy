@@ -54,6 +54,10 @@ BSC32=bscmake.exe
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /machine:I386
 # ADD LINK32 kernel32.lib user32.lib gdi32.lib opengl32.lib /nologo /subsystem:windows /machine:I386
+# Begin Special Build Tool
+SOURCE="$(InputPath)"
+PostBuild_Cmds=upx .\release\win32shadertoy.exe
+# End Special Build Tool
 
 !ELSEIF  "$(CFG)" == "win32shadertoy - Win32 Debug"
 
@@ -122,6 +126,15 @@ SOURCE=.\textures.asm
 !IF  "$(CFG)" == "win32shadertoy - Win32 Release"
 
 # PROP Ignore_Default_Tool 1
+# Begin Custom Build
+IntDir=.\Release
+InputPath=.\textures.asm
+InputName=textures
+
+"$(IntDir)\$(InputName).obj" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+	nasmw -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
+
+# End Custom Build
 
 !ELSEIF  "$(CFG)" == "win32shadertoy - Win32 Debug"
 
@@ -132,7 +145,7 @@ InputPath=.\textures.asm
 InputName=textures
 
 "$(IntDir)\$(InputName).obj" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
-	;nasmw -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
+	nasmw -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
 
 # End Custom Build
 
