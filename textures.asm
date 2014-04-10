@@ -5,52 +5,44 @@ SECTION .data
 global _tex00jpg
 _tex00jpg:
 incbin ".\textures\tex00.jpg"
-;incbin ".\textures\tex00_512x512_RGB.bin"
+;incbin ".\textures\untitled.jpg"
 
 global _tex01jpg
 _tex01jpg:
-incbin ".\textures\tex01.jpg"
-;incbin ".\textures\tex01_1024x1024_RGB.bin"
+incbin ".\textures\_tex01.jpg"
 
 global _tex02jpg
 _tex02jpg:
 incbin ".\textures\tex02.jpg"
-;incbin ".\textures\tex02_512x512_RGB.bin"
 
 global _tex03jpg
 _tex03jpg:
 incbin ".\textures\tex03.jpg"
-;incbin ".\textures\tex03_512x512_RGB.bin"
 
 global _tex04jpg
 _tex04jpg:
 incbin ".\textures\tex04.jpg"
-;incbin ".\textures\tex04_512x512_RGB.bin"
 
 global _tex05jpg
 _tex05jpg:
-incbin ".\textures\tex05.jpg"
-;incbin ".\textures\tex05_1024x1024_RGB.bin"
+incbin ".\textures\_tex05.jpg"
 
 global _tex06jpg
 _tex06jpg:
-incbin ".\textures\tex06.jpg"
-;incbin ".\textures\tex06_1024x1024_RGB.bin"
+incbin ".\textures\_tex06.jpg"
 
 global _tex07jpg
 _tex07jpg:
-incbin ".\textures\tex07.jpg"
-;incbin ".\textures\tex07_1024x1024_RGB.bin"
+incbin ".\textures\_tex07.jpg"
 
 global _tex08jpg
 _tex08jpg:
-incbin ".\textures\tex08.jpg"
-;incbin ".\textures\tex08_512x512_RGB.bin"
+incbin ".\textures\_tex08.jpg"
 
 global _tex09jpg
 _tex09jpg:
-incbin ".\textures\tex09.jpg"
-;incbin ".\textures\tex09_1024x1024_RGB.bin"
+incbin ".\textures\_tex09.jpg"
+
 
 global _tex10_64x64_L
 _tex10_64x64_L:

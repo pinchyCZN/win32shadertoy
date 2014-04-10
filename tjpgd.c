@@ -910,6 +910,7 @@ JRESULT jd_prepare (
 		case 0xCE:	/* SOF14 */
 		case 0xCF:	/* SOF15 */
 		case 0xD9:	/* EOI */
+			printf("type=%02X\n",marker & 0xFF);
 			return JDR_FMT3;	/* Unsuppoted JPEG standard (may be progressive JPEG) */
 
 		default:	/* Unknown segment (comment, exif or etc..) */

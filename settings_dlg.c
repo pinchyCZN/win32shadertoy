@@ -33,22 +33,6 @@ unsigned char *tex07_1024x1024_RGB=0;
 unsigned char *tex08_512x512_RGB=0;
 unsigned char *tex09_1024x1024_RGB=0;
 
-struct DECOMPRESS_LIST{
-	unsigned char *src;
-	unsigned char **dst;
-};
-struct DECOMPRESS_LIST jpg_list[10]={
-	{&tex00jpg,&tex00_512x512_RGB},
-	{&tex01jpg,&tex01_1024x1024_RGB},
-	{&tex02jpg,&tex02_512x512_RGB},
-	{&tex03jpg,&tex03_512x512_RGB},
-	{&tex04jpg,&tex04_512x512_RGB},
-	{&tex05jpg,&tex05_1024x1024_RGB},
-	{&tex06jpg,&tex06_1024x1024_RGB},
-	{&tex07jpg,&tex07_1024x1024_RGB},
-	{&tex08jpg,&tex08_512x512_RGB},
-	{&tex09jpg,&tex09_1024x1024_RGB}
-};
 extern unsigned char tex10_64x64_L[];
 extern unsigned char tex11_64x64_RGBA[];
 extern unsigned char tex12_256x256_L[];
@@ -97,6 +81,24 @@ struct TEXTURE_FILE tex_files[]={
 	{"tex15_8x8_L",tex15_8x8_L,8,8,1},
 	{"tex16_256x256_RGBA",tex16_256x256_RGBA,256,256,4}
 };
+struct DECOMPRESS_LIST{
+	unsigned char *src;
+	unsigned char **dst;
+	struct TEXTURE_FILE *tf;
+};
+struct DECOMPRESS_LIST jpg_list[]={
+	{&tex00jpg,&tex00_512x512_RGB,&tex_files[0]},
+	{&tex01jpg,&tex01_1024x1024_RGB,&tex_files[1]},
+	{&tex02jpg,&tex02_512x512_RGB,&tex_files[2]},
+	{&tex03jpg,&tex03_512x512_RGB,&tex_files[3]},
+	{&tex04jpg,&tex04_512x512_RGB,&tex_files[4]},
+	{&tex05jpg,&tex05_1024x1024_RGB,&tex_files[5]},
+	{&tex06jpg,&tex06_1024x1024_RGB,&tex_files[6]},
+	{&tex07jpg,&tex07_1024x1024_RGB,&tex_files[7]},
+	{&tex08jpg,&tex08_512x512_RGB,&tex_files[8]},
+	{&tex09jpg,&tex09_1024x1024_RGB,&tex_files[9]}
+
+};
 struct FONT_NAME{
 	int font_num;
 	char *font_name;
@@ -125,6 +127,8 @@ int downsample(unsigned char *inbuf,int inw,int inh,int bpp,unsigned char *outbu
 {
 	int x,y;
 	int flip,modx=1,mody=1;
+	if(inbuf==0 || outbuf==0)
+		return FALSE;
 	if(outw!=0 && outw<inw)
 		modx=inw/outw;
 	if(outh!=0 && outh<inh)
@@ -225,14 +229,109 @@ int bind_textures(struct GL_TEXTURE_INFO *textures)
 	}
 	return TRUE;
 }
+struct IOBUF{
+	unsigned char *in;
+	int position;
+	unsigned char *out;
+	int outsize;
+	int width;
+};
+UINT in_func (JDEC* jd, BYTE* buff, UINT nbyte)
+{
+	struct IOBUF *io=jd->device;
+	if(io==0 || io->in==0)
+		return 0;
+	if(buff)
+		memcpy(buff,io->in+io->position,nbyte);
+	io->position+=nbyte;
+	return nbyte;
+}
+UINT out_func (JDEC* jd, void* bitmap, JRECT* rect)
+{
+	struct IOBUF *io=jd->device;
+	int offset,width;
+	if(io==0 || io->out==0)
+		return 0;
+	offset=3 * (rect->top * io->width + rect->left);
+	width=3 * (rect->right - rect->left + 1);
+	if(offset+width<=io->outsize){
+		int i,height;
+		char *src,*dst;
+		src=bitmap;
+		dst=io->out+offset;
+		height=rect->bottom-rect->top+1;
+		for(i=0;i<height;i++){
+			memcpy(dst+(i*3*io->width),src+(i*width),width);
+		}
+	}
+	else
+		printf("decompress size exceeded\n");
+	return 1;
+}
 int load_textures()
 {
-	int i;
-	for(i=0;i<sizeof(jpg_list)/sizeof(struct DECOMPRESS_LIST);i++){
-		unsigned char *src,*dst;
-		src=jpg_list[i].src;
-		dst=*jpg_list[i].dst;
-
+	static int unpack_jpg=TRUE;
+	if(unpack_jpg){
+		void *work;
+		int work_size=3100;
+		unpack_jpg=FALSE;
+		work=malloc(work_size);
+		if(work){
+			int i;
+			for(i=0;i<sizeof(jpg_list)/sizeof(struct DECOMPRESS_LIST);i++){
+				unsigned char *src,*dst;
+				JDEC jdec;
+				JRESULT res;
+				struct IOBUF io;
+				src=jpg_list[i].src;
+				io.in=src;
+				io.position=0;
+				res=jd_prepare(&jdec,in_func,work,work_size,&io);
+				if(res==JDR_OK){
+					int decomp_size=3 * jdec.width * jdec.height;
+					printf("Image dimensions: %u by %u. %u bytes used.\n", jdec.width, jdec.height, work_size - jdec.sz_pool);
+					dst=malloc(decomp_size);
+					if(dst){
+						*jpg_list[i].dst=dst;
+						io.out=dst;
+						io.outsize=decomp_size;
+						io.width=jdec.width;
+						res=jd_decomp(&jdec,out_func,0);
+						if(res==JDR_OK){
+							struct TEXTURE_FILE *tf;
+							tex_files[i].data=dst;
+							tex_files[i].w=jdec.width;
+							tex_files[i].h=jdec.height;
+							tf=jpg_list[i].tf;
+							if(tf){
+								tf->data=dst;
+							}
+							printf("\rOK  \n");
+							{
+								/*
+								FILE *f;
+								char str[80];
+								sprintf(str,"c:\\temp\\test%ix%i.bin",jdec.width,jdec.height);
+								f=fopen(str,"wb");
+								if(f){
+									fwrite(tf->data,1,tf->w*tf->h*3,f);
+									fclose(f);
+								}
+								*/
+								
+							}
+						}
+						else
+							printf("Failed to decompress: rc=%d\n", res);
+					}
+				}else{
+					struct TEXTURE_FILE *tf;
+					tf=jpg_list[i].tf;
+					printf("Failed to prepare: rc=%d %s\n", res,tf->name);
+				}
+			}
+			free(work);
+		}
 	}
 	return bind_textures(&gl_textures);
 }
