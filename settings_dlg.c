@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <GL/gl.h>
 #include "glext.h"
+#include "tjpgd.h"
 
 #include "resource.h"
 
@@ -10,16 +11,44 @@ extern int src_sample;
 extern const char *sample1,*sample2,*sample3;
 extern HINSTANCE ghinstance;
 extern HWND heditwin;
-extern unsigned char tex00_512x512_RGB[];
-extern unsigned char tex01_1024x1024_RGB[];
-extern unsigned char tex02_512x512_RGB[];
-extern unsigned char tex03_512x512_RGB[];
-extern unsigned char tex04_512x512_RGB[];
-extern unsigned char tex05_1024x1024_RGB[];
-extern unsigned char tex06_1024x1024_RGB[];
-extern unsigned char tex07_1024x1024_RGB[];
-extern unsigned char tex08_512x512_RGB[];
-extern unsigned char tex09_1024x1024_RGB[];
+extern unsigned char tex00jpg[];
+extern unsigned char tex01jpg[];
+extern unsigned char tex02jpg[];
+extern unsigned char tex03jpg[];
+extern unsigned char tex04jpg[];
+extern unsigned char tex05jpg[];
+extern unsigned char tex06jpg[];
+extern unsigned char tex07jpg[];
+extern unsigned char tex08jpg[];
+extern unsigned char tex09jpg[];
+
+unsigned char *tex00_512x512_RGB=0;
+unsigned char *tex01_1024x1024_RGB=0;
+unsigned char *tex02_512x512_RGB=0;
+unsigned char *tex03_512x512_RGB=0;
+unsigned char *tex04_512x512_RGB=0;
+unsigned char *tex05_1024x1024_RGB=0;
+unsigned char *tex06_1024x1024_RGB=0;
+unsigned char *tex07_1024x1024_RGB=0;
+unsigned char *tex08_512x512_RGB=0;
+unsigned char *tex09_1024x1024_RGB=0;
+
+struct DECOMPRESS_LIST{
+	unsigned char *src;
+	unsigned char **dst;
+};
+struct DECOMPRESS_LIST jpg_list[10]={
+	{&tex00jpg,&tex00_512x512_RGB},
+	{&tex01jpg,&tex01_1024x1024_RGB},
+	{&tex02jpg,&tex02_512x512_RGB},
+	{&tex03jpg,&tex03_512x512_RGB},
+	{&tex04jpg,&tex04_512x512_RGB},
+	{&tex05jpg,&tex05_1024x1024_RGB},
+	{&tex06jpg,&tex06_1024x1024_RGB},
+	{&tex07jpg,&tex07_1024x1024_RGB},
+	{&tex08jpg,&tex08_512x512_RGB},
+	{&tex09jpg,&tex09_1024x1024_RGB}
+};
 extern unsigned char tex10_64x64_L[];
 extern unsigned char tex11_64x64_RGBA[];
 extern unsigned char tex12_256x256_L[];
@@ -51,16 +80,16 @@ struct GL_TEXTURE_INFO gl_textures[4]={0};
 
 #define NUM_TEXTURES 16
 struct TEXTURE_FILE tex_files[]={
-	{"tex00_512x512_RGB",tex00_512x512_RGB,512,512,3},
-	{"tex01_1024x1024_RGB",tex01_1024x1024_RGB,1024,1024,3},
-	{"tex02_512x512_RGB",tex02_512x512_RGB,512,512,3},
-	{"tex03_512x512_RGB",tex03_512x512_RGB,512,512,3},
-	{"tex04_512x512_RGB",tex04_512x512_RGB,512,512,3},
-	{"tex05_1024x1024_RGB",tex05_1024x1024_RGB,1024,1024,3},
-	{"tex06_1024x1024_RGB",tex06_1024x1024_RGB,1024,1024,3},
-	{"tex07_1024x1024_RGB",tex07_1024x1024_RGB,1024,1024,3},
-	{"tex08_512x512_RGB",tex08_512x512_RGB,512,512,3},
-	{"tex09_1024x1024_RGB",tex09_1024x1024_RGB,1024,1024,3},
+	{"tex00_512x512_RGB",0,512,512,3},
+	{"tex01_1024x1024_RGB",0,1024,1024,3},
+	{"tex02_512x512_RGB",0,512,512,3},
+	{"tex03_512x512_RGB",0,512,512,3},
+	{"tex04_512x512_RGB",0,512,512,3},
+	{"tex05_1024x1024_RGB",0,1024,1024,3},
+	{"tex06_1024x1024_RGB",0,1024,1024,3},
+	{"tex07_1024x1024_RGB",0,1024,1024,3},
+	{"tex08_512x512_RGB",0,512,512,3},
+	{"tex09_1024x1024_RGB",0,1024,1024,3},
 	{"tex10_64x64_L",tex10_64x64_L,64,64,1},
 	{"tex11_64x64_RGBA",tex11_64x64_RGBA,64,64,4},
 	{"tex12_256x256_L",tex12_256x256_L,256,256,1},
@@ -198,6 +227,13 @@ int bind_textures(struct GL_TEXTURE_INFO *textures)
 }
 int load_textures()
 {
+	int i;
+	for(i=0;i<sizeof(jpg_list)/sizeof(struct DECOMPRESS_LIST);i++){
+		unsigned char *src,*dst;
+		src=jpg_list[i].src;
+		dst=*jpg_list[i].dst;
+
+	}
 	return bind_textures(&gl_textures);
 }
 LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
