@@ -1,4 +1,7 @@
 #include <windows.h>
+#include <GL/gl.h>
+#include "glext.h"
+
 #include "resource.h"
 
 extern int load_preamble;
@@ -23,7 +26,10 @@ extern unsigned char tex12_256x256_L[];
 extern unsigned char tex14_256x32_RGBA[];
 extern unsigned char tex15_8x8_L[];
 extern unsigned char tex16_256x256_RGBA[];
-struct TEXTURE{
+
+static PFNGLCREATESHADERPROC glActiveTexture=0;
+
+struct TEXTURE_FILE{
 	char *name;
 	char *data;
 	int w,h;
@@ -33,11 +39,18 @@ struct TEX_BUTTON{
 	HWND hwnd;
 	int id;
 	int pressed;
-	char *tbuf;
-	char *name;
+	char *thumb;
+	void *tfile;
 };
+struct GL_TEXTURE_INFO{
+	int gltexture;
+	void *tex_button;
+};
+//int gltexture1=0,gltexture2=0,gltexture3=0,gltexture4=0;
+struct GL_TEXTURE_INFO gl_textures[4]={0};
+
 #define NUM_TEXTURES 16
-struct TEXTURE textures[]={
+struct TEXTURE_FILE tex_files[]={
 	{"tex00_512x512_RGB",tex00_512x512_RGB,512,512,3},
 	{"tex01_1024x1024_RGB",tex01_1024x1024_RGB,1024,1024,3},
 	{"tex02_512x512_RGB",tex02_512x512_RGB,512,512,3},
@@ -132,11 +145,67 @@ int downsample(unsigned char *inbuf,int inw,int inh,int bpp,unsigned char *outbu
 				}
 			}
 			*/
+
+int bind_textures(struct GL_TEXTURE_INFO *textures)
+{
+	int i;
+	if(textures==0)
+		return FALSE;
+	for(i=0;i<4;i++){
+		int *tn=0;
+		tn=&textures[i].gltexture;
+		if(*tn==0)
+			glGenTextures(1,tn);
+
+		if(*tn!=0){
+			struct TEX_BUTTON *tb;
+			int w=512,h=512;
+			int format=GL_RGB,colors=3;
+			char *data=tex00_512x512_RGB;
+			tb=textures[i].tex_button;
+			if(tb && tb->tfile){
+				struct TEXTURE_FILE *tf=tb->tfile;
+				if(tf){
+					if(tf->data)
+						data=tf->data;
+					if(tf->w && tf->h){
+						w=tf->w;
+						h=tf->h;
+					}
+					if(tf->bpp){
+						switch(tf->bpp){
+						case 1:format=GL_LUMINANCE;colors=1;break;
+						case 3:format=GL_RGB;colors=3;break;
+						case 4:format=GL_RGBA;colors=4;break;
+						}
+					}
+				}
+			}
+			if(glActiveTexture==0)
+				glActiveTexture=wglGetProcAddress("glActiveTexture");
+			if(glActiveTexture)
+				glActiveTexture(GL_TEXTURE0+i);
+			glBindTexture(GL_TEXTURE_2D,*tn);
+			glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+			glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_DECAL);
+			glTexImage2D(GL_TEXTURE_2D,0,colors,w,h,0,format,GL_UNSIGNED_BYTE,data);
+		}
+	}
+	return TRUE;
+}
+int load_textures()
+{
+	return bind_textures(&gl_textures);
+}
 LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	static struct TEX_BUTTON buttons[NUM_TEXTURES];
 	static int load_textures=TRUE;
 	static char *title=0;
+	static int current_channel=0;
 	switch(msg){
 	case WM_INITDIALOG:
 		{
@@ -157,19 +226,41 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			}
 			if(load_textures){
 				load_textures=FALSE;
-				for(i=0;i<sizeof(textures)/sizeof(struct TEXTURE);i++){
-					buttons[i].name=textures[i].name;
-					buttons[i].tbuf=malloc(64*64*3);
-					if(buttons[i].tbuf){
-						downsample(textures[i].data,textures[i].w,textures[i].h,textures[i].bpp,buttons[i].tbuf,64,64);
+				for(i=0;i<sizeof(tex_files)/sizeof(struct TEXTURE_FILE);i++){
+					buttons[i].tfile=&tex_files[i];
+					buttons[i].thumb=malloc(64*64*3);
+					if(buttons[i].thumb){
+						downsample(tex_files[i].data,tex_files[i].w,tex_files[i].h,tex_files[i].bpp,buttons[i].thumb,64,64);
 					}
 				}
 			}
 			ShowWindow(GetDlgItem(hwnd,IDC_BUTTON1),SW_HIDE);
 			SetWindowPos(hwnd,NULL,0,0,4*2+(64+4)*4,ycaption+4*2+(64+4)*4,SWP_NOMOVE|SWP_NOZORDER);
 			title=lparam;
-			if(title)
-				SetWindowText(hwnd,title);
+			if(title){
+				struct TEX_BUTTON *tb=gl_textures[current_channel].tex_button;
+				for(i=0;i<4;i++){
+					if(strchr(title,'0'+i))
+						current_channel=i;
+				}
+				if(tb && tb->tfile){
+					char str[80];
+					struct TEXTURE_FILE *tf=tb->tfile;
+					if(tf->name){
+						_snprintf(str,sizeof(str),"%s - %s",title,tf->name);
+						str[sizeof(str)-1]=0;
+						SetWindowText(hwnd,str);
+					}
+				}
+				else
+					SetWindowText(hwnd,title);
+			}
+			for(i=0;i<NUM_TEXTURES;i++){
+				if(gl_textures[current_channel].tex_button){
+					struct TEX_BUTTON *tb=gl_textures[current_channel].tex_button;
+					tb->pressed=TRUE;
+				}
+			}
 		}
 		break;
 	case WM_DRAWITEM:
@@ -191,7 +282,7 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			hdc=lpDIS->hDC;
 			for(i=0;i<NUM_TEXTURES;i++){
 				if(buttons[i].id==lpDIS->CtlID){
-					texbuf=buttons[i].tbuf;
+					texbuf=buttons[i].thumb;
 					selected=buttons[i].pressed;
 				}
 			}
@@ -206,11 +297,19 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				texbuf,
 				&bmi,
 				DIB_RGB_COLORS);
+			/*
 			if(selected)
 				flags=EDGE_SUNKEN;
 			else
 				flags=EDGE_RAISED;
 			DrawEdge(hdc,&lpDIS->rcItem,flags,BF_RECT);
+			*/
+			if(selected){
+				static HBRUSH red=0;
+				if(red==0)
+					red=CreateSolidBrush(0xFF);
+				FrameRect(hdc,&lpDIS->rcItem,red);
+			}
 
 		}
 		break;
@@ -224,12 +323,17 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				int i;
 				for(i=0;i<NUM_TEXTURES;i++){
 					if(id==buttons[i].id){
-						char str[80];
-						_snprintf(str,sizeof(str),"%s - %s",title,buttons[i].name);
-						str[sizeof(str)-1]=0;
-						SetWindowText(hwnd,str);
+						struct TEXTURE_FILE *tf;
+						tf=buttons[i].tfile;
+						if(tf){
+							char str[80];
+							_snprintf(str,sizeof(str),"%s - %s",title,tf->name);
+							str[sizeof(str)-1]=0;
+							SetWindowText(hwnd,str);
+						}
 						buttons[i].pressed=TRUE;
 						InvalidateRect(buttons[i].hwnd,0,FALSE);
+						gl_textures[current_channel].tex_button=&buttons[i];
 					}
 					else{
 						int inval=FALSE;
@@ -240,6 +344,7 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 							InvalidateRect(buttons[i].hwnd,0,FALSE);
 					}
 				}
+				bind_textures(&gl_textures);
 			}
 			break;
 		case IDOK:
@@ -319,10 +424,10 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				}
 			}
 			break;
+		case IDC_CHAN0:
 		case IDC_CHAN1:
 		case IDC_CHAN2:
 		case IDC_CHAN3:
-		case IDC_CHAN4:
 			if(HIWORD(wparam)==BN_CLICKED){
 				static char str[40]={0};
 				GetWindowText(lparam,str,sizeof(str));

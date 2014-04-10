@@ -7,7 +7,6 @@
 #include "sample.h"
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
 
-extern unsigned char tex00_512x512_RGB[];
 static PFNGLCREATEPROGRAMPROC glCreateProgram;
 static PFNGLSHADERSOURCEPROC glShaderSource;
 static PFNGLCOMPILESHADERPROC glCompileShader;
@@ -39,7 +38,6 @@ HWND heditwin=0;
 HINSTANCE ghinstance=0;
 int fragid=0,progid=0;
 int load_preamble=TRUE;
-int texture1=0,texture2=0,texture3=0,texture4=0;
 int src_sample=1;
 
 char *preamble= "uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
@@ -268,7 +266,7 @@ int set_vars(GLuint p)
 			loc=glGetUniformLocation(p,str);
 			if(loc!=-1){
 				int tex=0;
-				glProgramUniform1i(p,loc,0); //texture unit 0
+				glProgramUniform1i(p,loc,j); //texture unit 0-4
 				if(GL_NO_ERROR!=glGetError())
 					printf("error setting channel texture %i\n",j);
 			}
@@ -425,32 +423,6 @@ void reshape(int w, int h)
 	glLoadIdentity();
 	glViewport(0,0,(GLsizei)w,(GLsizei)h);
 
-}
-int load_textures()
-{
-	int tn=0;
-	glGenTextures(1,&tn);
-	if(tn!=0){
-		int i;
-		int w,h;
-		w=512;h=512;
-		glBindTexture(GL_TEXTURE_2D,tn);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_DECAL);
-		glTexImage2D(GL_TEXTURE_2D,0,3,w,h,0,GL_RGB,GL_UNSIGNED_BYTE,tex00_512x512_RGB);
-		for(i=0;i<4;i++){
-			switch(i){
-				case 0:texture1=tn;break;
-				case 1:texture2=tn;break;
-				case 2:texture3=tn;break;
-				case 3:texture4=tn;break;
-			}
-		}
-	}
-	return TRUE;
 }
 int insert_preamble(HWND hedit,char *buf,int len)
 {

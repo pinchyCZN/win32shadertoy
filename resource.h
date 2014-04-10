@@ -13,10 +13,10 @@
 #define IDC_LOAD_SAMPLE                 1007
 #define IDC_SETTINGS                    1009
 #define IDC_LOAD_PREAMBLE               1010
-#define IDC_CHAN1                       1011
-#define IDC_CHAN2                       1012
-#define IDC_CHAN3                       1013
-#define IDC_CHAN4                       1014
+#define IDC_CHAN0                       1011
+#define IDC_CHAN1                       1012
+#define IDC_CHAN2                       1013
+#define IDC_CHAN3                       1014
 #define IDC_BUTTON1                     1015
 
 // Next default values for new objects

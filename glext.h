@@ -1,6 +1,20 @@
 #define APIENTRYP APIENTRY *
 typedef GLbyte GLchar;
 
+#ifndef GL_VERSION_1_3
+#define GL_VERSION_1_3 1
+#define GL_TEXTURE0                       0x84C0
+#define GL_TEXTURE1                       0x84C1
+#define GL_TEXTURE2                       0x84C2
+#define GL_TEXTURE3                       0x84C3
+#define GL_TEXTURE4                       0x84C4
+typedef void (APIENTRYP PFNGLACTIVETEXTUREPROC) (GLenum texture);
+#ifdef GL_GLEXT_PROTOTYPES
+GLAPI void APIENTRY glActiveTexture (GLenum texture);
+#endif
+#endif /* GL_VERSION_1_3 */
+
+
 #ifndef GL_VERSION_2_0
 #define GL_BLEND_EQUATION_RGB             0x8009
 #define GL_VERTEX_ATTRIB_ARRAY_ENABLED    0x8622
@@ -82,8 +96,8 @@ typedef GLbyte GLchar;
 #define GL_STENCIL_BACK_REF               0x8CA3
 #define GL_STENCIL_BACK_VALUE_MASK        0x8CA4
 #define GL_STENCIL_BACK_WRITEMASK         0x8CA5
-#endif
 
+#endif
 
 #ifndef GL_VERSION_2_0
 #define GL_VERSION_2_0 1
