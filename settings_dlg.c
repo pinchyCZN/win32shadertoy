@@ -8,7 +8,7 @@
 extern int load_preamble;
 extern int fragid,progid;
 extern int src_sample;
-extern const char *sample1,*sample2,*sample3;
+extern const char *sample1,*sample2,*sample3,*sample4;
 extern HINSTANCE ghinstance;
 extern HWND heditwin;
 extern unsigned char tex00jpg[];
@@ -546,11 +546,12 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 					default:case 1:str=sample1;break;
 					case 2:str=sample2;break;
 					case 3:str=sample3;break;
+					case 4:str=sample4;break;
 				}
 				load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
 				compile(heditwin);
 				src_sample++;
-				if(src_sample>3)
+				if(src_sample>4)
 					src_sample=1;
 				{
 					char tmp[40];

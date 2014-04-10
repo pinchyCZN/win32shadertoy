@@ -30,6 +30,7 @@ static PFNGLGETUNIFORMFVPROC glGetUniformfv;
 static PFNGLGETUNIFORMIVPROC glGetUniformiv;
 
 int pause=FALSE;
+int pause_mouse=FALSE;
 int screenw=1360;
 int screenh=768;
 int clickx=0,clicky=0;
@@ -276,7 +277,8 @@ int set_vars(GLuint p)
 	if(loc!=-1){
 		float flist[4];
 		POINT pt;
-		GetCursorPos(&pt);
+		if(!pause_mouse)
+			GetCursorPos(&pt);
 		MapWindowPoints(NULL,hview,&pt,1);
 		flist[0]=pt.x;
 		flist[1]=screenh-pt.y;
@@ -482,6 +484,9 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			edit_busy=FALSE;
 		}
 		break;
+	case WM_RBUTTONDOWN:
+		pause_mouse=!pause_mouse;
+		break;
 	case WM_LBUTTONUP:
 	case WM_MBUTTONUP:
 	case WM_RBUTTONUP:
@@ -626,6 +631,9 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	case WM_LBUTTONDOWN:
 		clickx=LOWORD(lparam);
 		clicky=screenh-HIWORD(lparam);
+		break;
+	case WM_RBUTTONDOWN:
+		pause_mouse=!pause_mouse;
 		break;
 	case WM_KEYDOWN:
 		switch(wparam){
