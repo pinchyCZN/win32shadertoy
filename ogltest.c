@@ -528,6 +528,7 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	case WM_INITDIALOG:
 		orig_edit=SetWindowLong(GetDlgItem(hwnd,IDC_EDIT1),GWL_WNDPROC,subclass_edit);
 		break;
+	case WM_HELP:
 	case WM_CLOSE:
 		ShowWindow(hwnd,SW_HIDE);
 		return 0;
@@ -650,8 +651,12 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			EndDialog(hwnd,0);
 			break;
 		case VK_F1:
-			if(heditwin)
-				ShowWindow(heditwin,SW_SHOW);
+			if(heditwin){
+				int flag=SW_SHOW;
+				if(IsWindowVisible(heditwin))
+					flag=SW_HIDE;
+				ShowWindow(heditwin,flag);
+			}
 			break;
 		}
 		break;
