@@ -22,6 +22,8 @@ static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
 static PFNGLPROGRAMUNIFORM1IPROC glProgramUniform1i;
 static PFNGLPROGRAMUNIFORM1FPROC glProgramUniform1f;
 static PFNGLPROGRAMUNIFORM1FVPROC glProgramUniform1fv;
+static PFNGLPROGRAMUNIFORM2FPROC glProgramUniform2f;
+static PFNGLPROGRAMUNIFORM2FVPROC glProgramUniform2fv;
 static PFNGLPROGRAMUNIFORM3FPROC glProgramUniform3f;
 static PFNGLPROGRAMUNIFORM3FVPROC glProgramUniform3fv;
 static PFNGLPROGRAMUNIFORM4FVPROC glProgramUniform4fv;
@@ -282,12 +284,26 @@ int set_vars(GLuint p)
 			MapWindowPoints(NULL,hview,&pt,1);
 			flist[0]=pt.x;
 			flist[1]=screenh-pt.y;
+
 			flist[2]=clickx;
 			flist[3]=screenh-clicky;
+			glProgramUniform4fv(p,loc,1,flist);
+			clickx=pt.x;
+			clicky=pt.y;
+			if(GL_NO_ERROR!=glGetError())
+				printf("error setting mouse lmb down\n");
+		}
+		else{
+			flist[0]=clickx;
+			flist[1]=screenh-clicky;
+
+			flist[2]=0;
+			flist[3]=0;
 			glProgramUniform4fv(p,loc,1,flist);
 			if(GL_NO_ERROR!=glGetError())
 				printf("error setting mouse\n");
 		}
+
 	}
 	loc=glGetUniformLocation(p,"iDate");
 	if(loc!=-1){
@@ -320,6 +336,8 @@ int load_call_table()
 	glProgramUniform4fv=wglGetProcAddress("glProgramUniform4fv");
 	glProgramUniform3fv=wglGetProcAddress("glProgramUniform3fv");
 	glProgramUniform3f=wglGetProcAddress("glProgramUniform3f");
+	glProgramUniform2fv=wglGetProcAddress("glProgramUniform2fv");
+	glProgramUniform2f=wglGetProcAddress("glProgramUniform2f");
 	glProgramUniform1fv=wglGetProcAddress("glProgramUniform1fv");
 	glProgramUniform1f=wglGetProcAddress("glProgramUniform1f");
 	glProgramUniform1i=wglGetProcAddress("glProgramUniform1i");
