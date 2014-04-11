@@ -100,27 +100,6 @@ SOURCE=.\settings_dlg.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\tjpgd.c
-# End Source File
-# End Group
-# Begin Group "Header Files"
-
-# PROP Default_Filter "h;hpp;hxx;hm;inl"
-# Begin Source File
-
-SOURCE=.\sample.h
-# End Source File
-# End Group
-# Begin Group "Resource Files"
-
-# PROP Default_Filter "ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
-# Begin Source File
-
-SOURCE=.\resource.rc
-# End Source File
-# End Group
-# Begin Source File
-
 SOURCE=.\textures.asm
 
 !IF  "$(CFG)" == "win32shadertoy - Win32 Release"
@@ -152,5 +131,26 @@ InputName=textures
 !ENDIF 
 
 # End Source File
+# Begin Source File
+
+SOURCE=.\tjpgd.c
+# End Source File
+# End Group
+# Begin Group "Header Files"
+
+# PROP Default_Filter "h;hpp;hxx;hm;inl"
+# Begin Source File
+
+SOURCE=.\sample.h
+# End Source File
+# End Group
+# Begin Group "Resource Files"
+
+# PROP Default_Filter "ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
+# Begin Source File
+
+SOURCE=.\resource.rc
+# End Source File
+# End Group
 # End Target
 # End Project
