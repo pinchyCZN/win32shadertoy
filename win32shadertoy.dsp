@@ -102,6 +102,10 @@ SOURCE=.\ogltest.c
 
 SOURCE=.\settings_dlg.c
 # End Source File
+# Begin Source File
+
+SOURCE=.\tjpgd.c
+# End Source File
 # End Group
 # Begin Group "Header Files"
 
