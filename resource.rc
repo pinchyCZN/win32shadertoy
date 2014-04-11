@@ -64,6 +64,7 @@ BEGIN
     PUSHBUTTON      "Channel1",IDC_CHAN1,0,37,50,14
     PUSHBUTTON      "Channel2",IDC_CHAN2,0,53,50,14
     PUSHBUTTON      "Channel3",IDC_CHAN3,0,69,50,14
+    PUSHBUTTON      "Tiny window",IDC_TINY_WINDOW,136,54,50,14
 END
 
 IDD_TEXTURES DIALOG DISCARDABLE  0, 0, 186, 95
@@ -100,6 +101,18 @@ BEGIN
 END
 
 #endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDR_ACCELERATOR ACCELERATORS DISCARDABLE 
+BEGIN
+    VK_F5,          IDC_PAUSE,              VIRTKEY, NOINVERT
+    VK_F6,          IDC_TINY_WINDOW,        VIRTKEY, NOINVERT
+END
 
 #endif    // English (U.S.) resources
 /////////////////////////////////////////////////////////////////////////////

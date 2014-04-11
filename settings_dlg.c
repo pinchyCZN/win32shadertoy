@@ -494,7 +494,45 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	}
 	return 0;
 }
+int toggle_window_size(HWND hwnd)
+{
+	extern HWND hview;
+	RECT rect,desk;
+	int i,w,h,max;
+	GetWindowRect(hview,&rect);
+	w=GetSystemMetrics(SM_CXSCREEN);
+	h=GetSystemMetrics(SM_CYSCREEN);
+	max=5;
+	if(hwnd)
+		SetDlgItemText(hwnd,IDC_TINY_WINDOW,"Tiny window");
 
+	for(i=0;i<max;i++){
+		int sw,sh;
+		sw=w/(2+i);
+		sh=h/(2+i);
+		if((rect.right-rect.left)>sw){
+			SetWindowPos(hview,NULL,0,0,sw,sh,SWP_NOZORDER);
+			if(hwnd){
+				if(i==(max-1))
+					SetDlgItemText(hwnd,IDC_TINY_WINDOW,"smallest");
+			}
+			break;
+		}
+		if(i==(max-1)){
+			SetWindowPos(hview,NULL,0,0,w/2,h/2,SWP_NOZORDER);
+		}
+
+	}
+	/*
+	if((rect.right-rect.left)>=(w/2)){
+		SetWindowPos(hview,NULL,0,0,140,160,SWP_NOZORDER);
+	}
+	else{
+		SetWindowPos(hview,NULL,0,0,w/2,h/2,SWP_NOZORDER);
+	}
+	*/
+	return TRUE;
+}
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	static HWND hedit=0;
@@ -518,7 +556,6 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				sprintf(str,"load sample %i",src_sample);
 				SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,str);
 			}
-
 		}
 		break;
 	case WM_COMMAND:
@@ -560,6 +597,9 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				}
 			}
 			break;
+		case IDC_TINY_WINDOW:
+			toggle_window_size(hwnd);
+			break;
 		case IDC_CHAN0:
 		case IDC_CHAN1:
 		case IDC_CHAN2:
@@ -582,3 +622,4 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	}
 	return 0;
 }
+

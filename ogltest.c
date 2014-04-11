@@ -30,10 +30,10 @@ static PFNGLGETUNIFORMFVPROC glGetUniformfv;
 static PFNGLGETUNIFORMIVPROC glGetUniformiv;
 
 int pause=FALSE;
-int pause_mouse=FALSE;
 int screenw=1360;
 int screenh=768;
 int clickx=0,clicky=0;
+int lmb_down=FALSE;
 HWND hview=0;
 HWND heditwin=0;
 HINSTANCE ghinstance=0;
@@ -277,16 +277,17 @@ int set_vars(GLuint p)
 	if(loc!=-1){
 		float flist[4];
 		POINT pt;
-		if(!pause_mouse)
+		if(lmb_down){
 			GetCursorPos(&pt);
-		MapWindowPoints(NULL,hview,&pt,1);
-		flist[0]=pt.x;
-		flist[1]=screenh-pt.y;
-		flist[2]=clickx;
-		flist[3]=clicky;
-		glProgramUniform4fv(p,loc,1,flist);
-		if(GL_NO_ERROR!=glGetError())
-			printf("error setting mouse\n");
+			MapWindowPoints(NULL,hview,&pt,1);
+			flist[0]=pt.x;
+			flist[1]=screenh-pt.y;
+			flist[2]=clickx;
+			flist[3]=screenh-clicky;
+			glProgramUniform4fv(p,loc,1,flist);
+			if(GL_NO_ERROR!=glGetError())
+				printf("error setting mouse\n");
+		}
 	}
 	loc=glGetUniformLocation(p,"iDate");
 	if(loc!=-1){
@@ -484,9 +485,6 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			edit_busy=FALSE;
 		}
 		break;
-	case WM_RBUTTONDOWN:
-		pause_mouse=!pause_mouse;
-		break;
 	case WM_LBUTTONUP:
 	case WM_MBUTTONUP:
 	case WM_RBUTTONUP:
@@ -498,13 +496,6 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		case 'A':
 			if(GetKeyState(VK_CONTROL)&0x8000)
 				SendMessage(hwnd,EM_SETSEL,0,-1);
-			break;
-		case VK_F5:
-			{
-				HWND hparent=GetParent(hwnd);
-				SendMessage(GetDlgItem(hparent,IDC_PAUSE),BM_CLICK,0,0);
-				SetFocus(hwnd);
-			}
 			break;
 		}
 		break;
@@ -627,24 +618,36 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		}
         return 0;
 	case WM_COMMAND:
+		switch(LOWORD(wparam)){
+		case IDC_TINY_WINDOW:
+			toggle_window_size(0);
+			break;
+		case IDC_PAUSE:
+			{
+				HWND hcurrent,hbutton;
+				hcurrent=GetFocus();
+				hbutton=GetDlgItem(heditwin,IDC_PAUSE);
+				SetFocus(hbutton);
+				SendDlgItemMessage(heditwin,IDC_PAUSE,BM_CLICK,0,0);
+				if(IsWindow(hcurrent))
+					SetFocus(hcurrent);
+			}
+			break;
+		}
+		break;
+	case WM_LBUTTONUP:
+		lmb_down=FALSE;
 		break;
 	case WM_LBUTTONDOWN:
+		lmb_down=TRUE;
 		clickx=LOWORD(lparam);
 		clicky=screenh-HIWORD(lparam);
-		break;
-	case WM_RBUTTONDOWN:
-		pause_mouse=!pause_mouse;
 		break;
 	case WM_KEYDOWN:
 		switch(wparam){
 		case VK_ESCAPE:
 			PostQuitMessage(0);
 			EndDialog(hwnd,0);
-			break;
-		case VK_F5:
-			SetActiveWindow(heditwin);
-			SendMessage(GetDlgItem(heditwin,IDC_PAUSE),BM_CLICK,0,0);
-			SetFocus(hwnd);
 			break;
 		case VK_F1:
 			if(heditwin)
@@ -717,6 +720,7 @@ int create_view(HINSTANCE hInstance)
 int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,int iCmdShow)
 {
 	MSG msg;
+	HACCEL haccel;
 	ghinstance=hInstance;
 	open_console();
 	//create_view(hInstance);
@@ -725,8 +729,11 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 
 	UpdateWindow(hview);
 
+	haccel=LoadAccelerators(ghinstance,MAKEINTRESOURCE(IDR_ACCELERATOR));
 
 	while(GetMessage(&msg,NULL,0,0)){
+		if(haccel!=0)
+			TranslateAccelerator(hview,haccel,&msg);
 		if(!IsDialogMessage(heditwin,&msg)){
 		//	TranslateMessage(&msg);
 			DispatchMessage(&msg);
