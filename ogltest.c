@@ -4,7 +4,8 @@
 #include <GL/gl.h>
 #include "resource.h"
 #include "glext.h"
-#include "sample.h"
+extern const char *sample1,*sample2,*sample3;
+
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
 
 static PFNGLCREATEPROGRAMPROC glCreateProgram;
@@ -179,7 +180,7 @@ int load_frag_shader(GLuint id)
 	}
 	else{
 		printf("cant open file %s\n",fname);
-		printf("loading sample instead\n");
+		printf("loading sample instead,load other samples from settings dialog\n");
 		{
 			char *buf,*str;
 			int blen,prelen,rnd;
@@ -545,6 +546,7 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	switch(msg){
 	case WM_INITDIALOG:
 		orig_edit=SetWindowLong(GetDlgItem(hwnd,IDC_EDIT1),GWL_WNDPROC,subclass_edit);
+		SendDlgItemMessage(hwnd,IDC_EDIT1,WM_SETFONT,GetStockObject(ANSI_FIXED_FONT),0);
 		break;
 	case WM_HELP:
 	case WM_CLOSE:
@@ -665,8 +667,14 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	case WM_KEYDOWN:
 		switch(wparam){
 		case VK_ESCAPE:
-			PostQuitMessage(0);
-			EndDialog(hwnd,0);
+			if(lmb_down){
+				lmb_down=FALSE;
+				break;
+			}
+			if(IDOK==MessageBox(hwnd,"OK to QUIT?","QUIT?",MB_OKCANCEL)){
+				EndDialog(hwnd,0);
+				PostQuitMessage(0);
+			}
 			break;
 		case VK_F1:
 			if(heditwin){
