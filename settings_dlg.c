@@ -587,11 +587,12 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 					case 5:str=sample5;break;
 					case 6:str=sample6;break;
 					case 7:str=sample7;break;
+					case 8:str=sample8;break;
 				}
 				load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
 				compile(heditwin);
 				src_sample++;
-				if(src_sample>7)
+				if(src_sample>8)
 					src_sample=1;
 				{
 					char tmp[40];
