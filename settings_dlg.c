@@ -61,8 +61,11 @@ struct GL_TEXTURE_INFO{
 };
 //int gltexture1=0,gltexture2=0,gltexture3=0,gltexture4=0;
 struct GL_TEXTURE_INFO gl_textures[4]={0};
-
 #define NUM_TEXTURES 16
+static struct TEX_BUTTON buttons[NUM_TEXTURES];
+
+
+
 struct TEXTURE_FILE tex_files[]={
 	{"tex00_512x512_RGB",0,512,512,3},
 	{"tex01_1024x1024_RGB",0,1024,1024,3},
@@ -121,6 +124,24 @@ int fontname_to_int(char *name)
 		}
 	}
 	return DEFAULT_GUI_FONT;
+}
+int get_texture_res(int channel,int *x,int *y)
+{
+	int result=FALSE;
+	if(channel>=0 && channel<4){
+		struct TEX_BUTTON *tb=gl_textures[channel].tex_button;
+		if(tb){
+			struct TEXTURE_FILE *tf=tb->tfile;
+			if(tf){
+				if(x)
+					*x=tf->w;
+				if(y)
+					*y=tf->h;
+				result=TRUE;
+			}
+		}
+	}
+	return result;
 }
 //outbuf is BGR format 3bpp
 int downsample(unsigned char *inbuf,int inw,int inh,int bpp,unsigned char *outbuf,int outw,int outh)
@@ -268,6 +289,26 @@ UINT out_func (JDEC* jd, void* bitmap, JRECT* rect)
 		printf("decompress size exceeded\n");
 	return 1;
 }
+int init_texture_buttons()
+{
+	static int load_buttons=TRUE;
+	if(load_buttons){
+		int i;
+		load_buttons=FALSE;
+		for(i=0;i<sizeof(tex_files)/sizeof(struct TEXTURE_FILE);i++){
+			buttons[i].tfile=&tex_files[i];
+			buttons[i].thumb=malloc(64*64*3);
+			if(buttons[i].thumb){
+				downsample(tex_files[i].data,tex_files[i].w,tex_files[i].h,tex_files[i].bpp,buttons[i].thumb,64,64);
+			}
+		}
+		buttons[0].pressed=TRUE;
+		for(i=0;i<4;i++){
+			gl_textures[i].tex_button=&buttons[0];
+		}
+	}
+	return load_buttons;
+}
 int load_textures()
 {
 	static int unpack_jpg=TRUE;
@@ -333,12 +374,12 @@ int load_textures()
 			free(work);
 		}
 	}
+	init_texture_buttons();
 	return bind_textures(&gl_textures);
 }
+
 LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
-	static struct TEX_BUTTON buttons[NUM_TEXTURES];
-	static int load_textures=TRUE;
 	static char *title=0;
 	static int current_channel=0;
 	switch(msg){
@@ -347,6 +388,7 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			int i,j,id=IDC_BUTTON1+1;
 			int index=0;
 			int ycaption=GetSystemMetrics(SM_CYCAPTION);
+			init_texture_buttons();
 			for(j=0;j<NUM_TEXTURES/4;j++){
 				for(i=0;i<NUM_TEXTURES/4;i++){
 					HWND h;
@@ -357,16 +399,6 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 					index++;
 					id++;
 					//h=CreateWindow("TEXT","BUTTON",WS_CHILD|WS_VISIBLE|BS_OWNERDRAW|BS_PUSHBUTTON,4+i*(64+4),4+j*(64+4),64,64,hwnd,id,ghinstance,NULL);
-				}
-			}
-			if(load_textures){
-				load_textures=FALSE;
-				for(i=0;i<sizeof(tex_files)/sizeof(struct TEXTURE_FILE);i++){
-					buttons[i].tfile=&tex_files[i];
-					buttons[i].thumb=malloc(64*64*3);
-					if(buttons[i].thumb){
-						downsample(tex_files[i].data,tex_files[i].w,tex_files[i].h,tex_files[i].bpp,buttons[i].thumb,64,64);
-					}
 				}
 			}
 			ShowWindow(GetDlgItem(hwnd,IDC_BUTTON1),SW_HIDE);

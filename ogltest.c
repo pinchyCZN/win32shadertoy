@@ -258,8 +258,10 @@ int set_vars(GLuint p)
 			loc=glGetUniformLocation(p,str);
 			if(loc!=-1){
 				float flist[3];
-				flist[0]=64;
-				flist[1]=64;
+				int x=64,y=64;
+				get_texture_res(j,&x,&y);
+				flist[0]=x;
+				flist[1]=y;
 				flist[2]=0;
 				glProgramUniform3fv(p,loc,1,flist);
 				if(GL_NO_ERROR!=glGetError())
