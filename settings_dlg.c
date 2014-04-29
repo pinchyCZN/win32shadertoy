@@ -4,11 +4,11 @@
 #include "tjpgd.h"
 
 #include "resource.h"
+#include "sample.h"
 
 extern int load_preamble;
 extern int fragid,progid;
 extern int src_sample;
-extern const char *sample1,*sample2,*sample3,*sample4;
 extern HINSTANCE ghinstance;
 extern HWND heditwin;
 extern unsigned char tex00jpg[];
@@ -315,6 +315,7 @@ int load_textures()
 	if(unpack_jpg){
 		void *work;
 		int work_size=3100;
+		printf("unpacking JPG images\n");
 		unpack_jpg=FALSE;
 		work=malloc(work_size);
 		if(work){
@@ -347,7 +348,6 @@ int load_textures()
 							if(tf){
 								tf->data=dst;
 							}
-							printf("\rOK  \n");
 							{
 								/*
 								FILE *f;
@@ -616,11 +616,15 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 					case 2:str=sample2;break;
 					case 3:str=sample3;break;
 					case 4:str=sample4;break;
+					case 5:str=sample5;break;
+					case 6:str=sample6;break;
+					case 7:str=sample7;break;
+					case 8:str=sample8;break;
 				}
 				load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
 				compile(heditwin);
 				src_sample++;
-				if(src_sample>4)
+				if(src_sample>8)
 					src_sample=1;
 				{
 					char tmp[40];
