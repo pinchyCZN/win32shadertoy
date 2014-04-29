@@ -271,8 +271,8 @@ int set_vars(GLuint p)
 			sprintf(str,"iChannel%i",j);
 			loc=glGetUniformLocation(p,str);
 			if(loc!=-1){
-				int tex=0;
-				glProgramUniform1i(p,loc,j); //texture unit 0-4
+				int tex=j;
+				glProgramUniform1i(p,loc,tex); //texture unit 0-4
 				if(GL_NO_ERROR!=glGetError())
 					printf("error setting channel texture %i\n",j);
 			}
