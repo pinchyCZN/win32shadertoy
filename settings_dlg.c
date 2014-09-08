@@ -578,9 +578,11 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			for(i=0;i<sizeof(font_names)/sizeof(struct FONT_NAME);i++)
 				SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,font_names[i].font_name);
 			hfont=SendMessage(hedit,WM_GETFONT,0,0);
-			GetObject(hfont,sizeof(LOGFONT),&lf);
-			i=SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,lf.lfFaceName);
-			SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
+			if(hfont){
+				GetObject(hfont,sizeof(LOGFONT),&lf);
+				i=SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,lf.lfFaceName);
+				SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
+			}
 			if(load_preamble)
 				SendDlgItemMessage(hwnd,IDC_LOAD_PREAMBLE,BM_SETCHECK,BST_CHECKED,0);
 			{
