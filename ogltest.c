@@ -6,7 +6,7 @@
 #include "Commctrl.h"
 #include "resource.h"
 #include "glext.h"
-extern const char *sample1,*sample2,*sample3;
+extern const char sample1[],sample2[],sample3[];
 
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
 

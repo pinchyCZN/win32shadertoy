@@ -4,7 +4,9 @@
 #include "tjpgd.h"
 
 #include "resource.h"
-#include "sample.h"
+
+extern char *samples[];
+extern const char sample1[];
 
 extern int load_preamble;
 extern int fragid,progid;
@@ -587,7 +589,7 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				SendDlgItemMessage(hwnd,IDC_LOAD_PREAMBLE,BM_SETCHECK,BST_CHECKED,0);
 			{
 				char str[40];
-				sprintf(str,"load sample %i",src_sample);
+				sprintf(str,"load sample (%i)",src_sample+1);
 				SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,str);
 			}
 		}
@@ -612,25 +614,17 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			break;
 		case IDC_LOAD_SAMPLE:
 			if(HIWORD(wparam)==BN_CLICKED){
-				char *str=sample1;
-				switch(src_sample){
-					default:case 1:str=sample1;break;
-					case 2:str=sample2;break;
-					case 3:str=sample3;break;
-					case 4:str=sample4;break;
-					case 5:str=sample5;break;
-					case 6:str=sample6;break;
-					case 7:str=sample7;break;
-					case 8:str=sample8;break;
+				char *str;
+				str=samples[++src_sample];
+				if(str==0){
+					src_sample=0;
+					str=samples[src_sample];
 				}
 				load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
 				compile(heditwin);
-				src_sample++;
-				if(src_sample>8)
-					src_sample=1;
 				{
 					char tmp[40];
-					sprintf(tmp,"load sample %i",src_sample);
+					sprintf(tmp,"load sample (%i)",src_sample+1);
 					SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,tmp);
 				}
 			}

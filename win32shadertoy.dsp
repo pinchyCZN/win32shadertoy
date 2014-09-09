@@ -100,6 +100,39 @@ SOURCE=.\ogltest.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\samples.asm
+
+!IF  "$(CFG)" == "win32shadertoy - Win32 Release"
+
+# PROP Ignore_Default_Tool 1
+# Begin Custom Build
+IntDir=.\Release
+InputPath=.\samples.asm
+InputName=samples
+
+"$(IntDir)\$(InputName).obj" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+	nasm -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
+
+# End Custom Build
+
+!ELSEIF  "$(CFG)" == "win32shadertoy - Win32 Debug"
+
+# PROP Ignore_Default_Tool 1
+# Begin Custom Build
+IntDir=.\Debug
+InputPath=.\samples.asm
+InputName=samples
+
+"$(IntDir)\$(InputName).obj" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+	nasm -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
+
+# End Custom Build
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
 SOURCE=.\settings_dlg.c
 # End Source File
 # Begin Source File
@@ -115,7 +148,7 @@ InputPath=.\textures.asm
 InputName=textures
 
 "$(IntDir)\$(InputName).obj" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
-	nasmw -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
+	nasm -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
 
 # End Custom Build
 
@@ -128,7 +161,7 @@ InputPath=.\textures.asm
 InputName=textures
 
 "$(IntDir)\$(InputName).obj" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
-	nasmw -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
+	nasm -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
 
 # End Custom Build
 
