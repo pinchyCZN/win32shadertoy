@@ -2,6 +2,8 @@
 
 SECTION .data
 
+%define total_samples 12
+
 %macro inc_sample 1
 
 global _sample%1
@@ -15,7 +17,7 @@ _endsample%1:
 %endmacro
 
 %assign i 1
-%rep 11
+%rep total_samples
 
 inc_sample i
 
@@ -31,7 +33,7 @@ _samples:
 %endmacro
 
 %assign i 1
-%rep 11
+%rep total_samples
 	dd_pointer i
 %assign i i+1
 %endrep
