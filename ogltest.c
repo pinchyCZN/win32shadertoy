@@ -809,7 +809,9 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			load_textures();
 			{
 			RECT rect;
-			SetWindowPos(hwnd,HWND_TOP,0,0,sw/2,sh/2,0);
+			//SetWindowPos(hwnd,HWND_TOP,0,0,sw/2,sh/2,0);
+			SetWindowPos(hwnd,HWND_TOP,0,0,sw/(2+4),sh/(2+4),SWP_NOZORDER);
+
 			GetClientRect(hwnd,&rect);
 			screenw=rect.right-rect.left;
 			screenh=rect.bottom-rect.top;
@@ -939,7 +941,6 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 	HACCEL haccel;
 	ghinstance=hInstance;
 	LoadLibrary("RICHED32.DLL");
-	LoadLibrary("RICHED20.DLL");
 	open_console();
 	//create_view(hInstance);
 	hview=CreateDialog(hInstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),NULL,WndProc);
