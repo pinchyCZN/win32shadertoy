@@ -6,6 +6,7 @@
 #include "Commctrl.h"
 #include "resource.h"
 #include "glext.h"
+
 extern const char sample1[],sample2[],sample3[];
 
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
@@ -137,8 +138,11 @@ int load_shader_string(int id,char *str,HWND hedit)
 	char *buf,*pre="";
 	int blen,prelen;
 	blen=strlen(str)+4;
-	if(load_preamble)
-		pre=preamble;
+	if(load_preamble){
+		int prelen=strlen(preamble);
+		if((blen < prelen) || (memcmp(str,preamble,prelen)!=0))
+			pre=preamble;
+	}
 	prelen=strlen(pre);
 	blen+=prelen;
 	buf=malloc(blen);
@@ -158,7 +162,7 @@ int load_shader_string(int id,char *str,HWND hedit)
 int load_frag_shader(GLuint id)
 {
 	FILE *f;
-	char *fname="b:\\test.c";
+	char *fname="current.txt";
 	f=fopen(fname,"rb");
 	if(f){
 		int len;
@@ -720,7 +724,56 @@ int compile(HWND hwin)
 	return result;
 }
 
-
+int save_text(hedit,hstatus)
+{
+	if(hedit){
+		char *s;
+		int size=0x10000;
+		s=malloc(size);
+		if(s){
+			FILE *f;
+			char path[MAX_PATH]={0};
+			GetWindowText(hedit,s,size);
+			GetCurrentDirectory(sizeof(path),path);
+			_snprintf(path,sizeof(path),"%s\\%s",path,"current.txt");
+			path[sizeof(path)-1]=0;
+			f=fopen(path,"wb");
+			if(f){
+				int len;
+				len=strlen(s);
+				fwrite(s,1,len,f);
+				fclose(f);
+				SetWindowText(hstatus,path);
+			}
+			free(s);
+		}
+	}
+	return 0;
+}
+int load_current(hedit)
+{
+	if(hedit){
+		char *s;
+		int size=0x10000;
+		s=malloc(size);
+		if(s){
+			FILE *f;
+			char path[MAX_PATH]={0};
+			GetCurrentDirectory(sizeof(path),path);
+			_snprintf(path,sizeof(path),"%s\\%s",path,"current.txt");
+			path[sizeof(path)-1]=0;
+			f=fopen(path,"rb");
+			if(f){
+				memset(s,0,size);
+				fread(s,1,size-1,f);
+				fclose(f);
+				SetWindowText(hedit,s);
+			}
+			free(s);
+		}
+	}
+	return 0;
+}
 
 LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
@@ -752,6 +805,12 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		case IDCANCEL:
 			ShowWindow(hwnd,SW_HIDE);
 			break;
+		case IDC_SAVE:
+			if((GetKeyState(VK_CONTROL)&0x8000)||(GetKeyState(VK_SHIFT)&0x8000))
+				load_current(GetDlgItem(hwnd,IDC_EDIT1));
+			else
+				save_text(GetDlgItem(hwnd,IDC_EDIT1),GetDlgItem(hwnd,IDC_STATUS));
+			break;
 		case IDC_SETTINGS:
 			DialogBoxParam(ghinstance,MAKEINTRESOURCE(IDD_SETTINGS),hwnd,settings_proc,GetDlgItem(hwnd,IDC_EDIT1));
 			break;
@@ -765,13 +824,14 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			SetWindowPos(GetDlgItem(hwnd,IDC_EDIT1),NULL,0,0,w,h-25,SWP_NOZORDER);
 			SetWindowPos(GetDlgItem(hwnd,IDC_SETTINGS),NULL,0,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
 			SetWindowPos(GetDlgItem(hwnd,IDC_PAUSE),NULL,100,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
+			SetWindowPos(GetDlgItem(hwnd,IDC_SAVE),NULL,200,h-25,0,0,SWP_NOSIZE|SWP_NOZORDER);
 			{
 				int cx,cy;
-				cx=w-200;
+				cx=w-300;
 				if(cx<0)
 					cx=10;
 				cy=25;
-				SetWindowPos(GetDlgItem(hwnd,IDC_STATUS),NULL,200,h-25,cx,cy,SWP_NOZORDER);
+				SetWindowPos(GetDlgItem(hwnd,IDC_STATUS),NULL,300,h-25,cx,cy,SWP_NOZORDER);
 			}
 		}
 		break;
@@ -803,10 +863,10 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				load_call_table();
 			}
 			heditwin=CreateDialog(ghinstance,MAKEINTRESOURCE(IDD_SHADER_EDIT),hwnd,WndEdit);
-			if(heditwin)
-				SetWindowPos(heditwin,HWND_TOP,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW|SWP_NOZORDER);
 			set_shaders(&program,TRUE);
 			load_textures();
+			if(heditwin)
+				SetWindowPos(heditwin,HWND_TOP,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW|SWP_NOZORDER);
 			{
 			RECT rect;
 			//SetWindowPos(hwnd,HWND_TOP,0,0,sw/2,sh/2,0);
