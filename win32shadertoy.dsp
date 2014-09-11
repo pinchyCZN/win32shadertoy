@@ -96,6 +96,10 @@ SOURCE=.\debug_print.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\editor.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\ogltest.c
 # End Source File
 # Begin Source File

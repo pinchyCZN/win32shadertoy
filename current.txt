@@ -142,7 +142,7 @@ float PrintValue(const in vec2 vStringCharCoords, const in float fValue, const i
 				// This is inaccurate - I think because I treat each digit independently
 				// The value 2.0 gets printed as 2.09 :/
 				//fDigitCharacter = mod(floor(fDigitValue), 10.0);
-				fDigitCharacter = mod(floor(0.0001+fDigitValue), 10.0); // fix from iq
+				fDigitCharacter = mod(floor(0.001+fDigitValue), 10.0); // fix from iq
 			}		
 		}
 	}
@@ -163,27 +163,44 @@ float sphere(vec3 ray, vec3 dir, vec3 center, float radius)
 	float c = dot(rc, rc) - (radius*radius);
 	float b = dot(dir, rc);
 	float d = b*b - c;
-	float t = -b - sqrt(abs(d));
+	float t = b + sqrt(abs(d));
 	float st = step(0.0, min(t,d));
 	return mix(-1.0, t, st);
 }
 
+float calc(vec3 ray,vec3 center,float radius)
+{
+//length(max(abs(p)-b,0.0));
+	float result=0;
+	if(length(center*radius)>length(ray))
+		result=1;
+	else
+		result=0;
+	return result;
+}
 
 void main(void)
 {
 	vec2 vFontSize = vec2(8.0, 15.0);
-	vec2 uv = (-1.0 + 2.0*gl_FragCoord.xy / iResolution.xy) * 
-		vec2(iResolution.x/iResolution.y, 1.0);
-	vec3 ro = vec3(uv, .0);
-	vec3 rd = normalize(vec3(1,34, 30));
-	vec3 p = vec3(1.0, .90, 1.0);
-	float t = sphere(ro, rd, p, .80);
-	vec3 nml = normalize(p - (ro+rd*t));
+	vec2 uv = gl_FragCoord.xy - (iResolution.xy/2);
+	vec3 ro = vec3(uv, iMouse.x/10);
+	vec3 rd = normalize(vec3(1,34, -30));
+	vec3 center = vec3(1.0, 1.90, 1.0);
+	float t = sphere(ro, rd, center, 21.20);
+	vec3 march = 0;
+	int i;
+	for(i=0;i<100;i++){
+		march=ro+((float)i/10);
+		t=calc(march,center,7);
+		if(t>0)
+			break;
+		
+	}
 	
-	float val = PrintValue(vec2(10,10), vFontSize , 99.0, 9.0, 9.0);
+	float val = PrintValue(vec2(10,10), vFontSize , iMouse.x, 4.0, 2.0);
 
-	vec3 col =  vec3(0.9, 1.8, 1.0);
+	vec3 col =  vec3(0., .5, 0);
 	col=mix(0, col, t);
-	col+=val*9;
+	col+=vec3(val*9,0,0);
 	gl_FragColor = vec4(col , 1.0 );
 }
