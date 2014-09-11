@@ -168,11 +168,16 @@ float sphere(vec3 ray, vec3 dir, vec3 center, float radius)
 	return mix(-1.0, t, st);
 }
 
-float calc(vec3 ray,vec3 center,float radius)
+float calc(vec3 ro,vec3 dir,vec3 center,float radius)
 {
 //length(max(abs(p)-b,0.0));
 	float result=0;
-	if(length(center*radius)>length(ray))
+	vec3 r2=ro+dir;
+	float a=dot(r2,center);
+	float b=dot(r2,r2)-1;
+	float c=a*a-b;
+
+	if(c>0)
 		result=1;
 	else
 		result=0;
@@ -186,12 +191,13 @@ void main(void)
 	vec3 ro = vec3(uv, iMouse.x/10);
 	vec3 rd = normalize(vec3(1,34, -30));
 	vec3 center = vec3(1.0, 1.90, 1.0);
-	float t = sphere(ro, rd, center, 21.20);
+	float t;
+	vec3 dir=vec3(0,0,0);
 	vec3 march = 0;
 	int i;
 	for(i=0;i<100;i++){
-		march=ro+((float)i/10);
-		t=calc(march,center,7);
+		march=ro+((float)i/10.0);
+		t=calc(march,dir,center,7);
 		if(t>0)
 			break;
 		
