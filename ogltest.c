@@ -460,6 +460,16 @@ int insert_preamble(HWND hedit,char *buf,int len)
 	int prelen=strlen(pre);
 	if(memcmp(buf,pre,prelen)!=0){
 		int start=0,end=0;
+		char *tmp;
+		int size=0x10000;
+		tmp=malloc(size);
+		if(tmp && len>0){
+			_snprintf(tmp,size,"%s\r\n%s",pre,buf);
+			tmp[size-1]=0;
+			strncpy(buf,tmp,len);
+			buf[len-1]=0;
+			free(tmp);
+		}
 		SendMessage(hedit,EM_GETSEL,&start,&end);
 		SendMessage(hedit,EM_SETSEL,0,0);
 		SendMessage(hedit,EM_REPLACESEL,FALSE,pre);
