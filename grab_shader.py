@@ -1,4 +1,6 @@
 import urllib
+import urllib.parse
+import urllib.request
 
 shaderurl='https://www.shadertoy.com/presets/'
 ##for i in range(10):
@@ -32,10 +34,10 @@ shaderurl='https://www.shadertoy.com/'
 shaderid="ldfXzS"
 try:
     f="{ \"shaders\" : [\""+shaderid+"\"] }"
-    f = "s=" + urllib.quote(f);
+    f = "s=" + urllib.parse.quote(f);
     f="shadertoy/?"+f #shaderid
     print(f)
-    page=urllib.urlopen(shaderurl+f)
+    page=urllib.request.urlopen(shaderurl+f)
     data=page.read()
     page.close()
     print(data)
