@@ -46,8 +46,8 @@ HWND heditwin=0;
 HINSTANCE ghinstance=0;
 int fragid=0,progid=0;
 int load_preamble=TRUE;
-int src_sample=1;
-extern 
+int src_sample=0;
+char start_dir[MAX_PATH]={0};
 
 char *preamble= "uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
 "uniform float     iGlobalTime;           // shader playback time (in seconds)\r\n"
@@ -164,7 +164,8 @@ int load_shader_string(int id,char *str,HWND hedit)
 int load_frag_shader(GLuint id)
 {
 	FILE *f;
-	char *fname="current.txt";
+	char fname[MAX_PATH]="";
+	load_current_path(fname,sizeof(fname));
 	f=fopen(fname,"rb");
 	if(f){
 		int len;
@@ -507,9 +508,7 @@ int save_text(hedit,hstatus)
 			FILE *f;
 			char path[MAX_PATH]={0};
 			GetWindowText(hedit,s,size);
-			GetCurrentDirectory(sizeof(path),path);
-			_snprintf(path,sizeof(path),"%s\\%s",path,"current.txt");
-			path[sizeof(path)-1]=0;
+			load_current_path(path,sizeof(path));
 			f=fopen(path,"wb");
 			if(f){
 				int len;
@@ -523,6 +522,13 @@ int save_text(hedit,hstatus)
 	}
 	return 0;
 }
+int load_current_path(char *path,int len)
+{
+	if(path && len>0){
+		_snprintf(path,len,"%s\\%s",start_dir,"current.txt");
+		path[len-1]=0;
+	}
+}
 int load_current(hedit)
 {
 	if(hedit){
@@ -532,9 +538,7 @@ int load_current(hedit)
 		if(s){
 			FILE *f;
 			char path[MAX_PATH]={0};
-			GetCurrentDirectory(sizeof(path),path);
-			_snprintf(path,sizeof(path),"%s\\%s",path,"current.txt");
-			path[sizeof(path)-1]=0;
+			load_current_path(path,sizeof(path));
 			f=fopen(path,"rb");
 			if(f){
 				memset(s,0,size);
@@ -572,12 +576,16 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			heditwin=CreateDialog(ghinstance,MAKEINTRESOURCE(IDD_SHADER_EDIT),hwnd,WndEdit);
 			set_shaders(&program,TRUE);
 			load_textures();
-			if(heditwin)
+			if(heditwin){
 				SetWindowPos(heditwin,HWND_TOP,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW|SWP_NOZORDER);
+				restore_window(heditwin,"EDITOR");
+				PostMessage(hwnd,WM_APP,1,0);
+			}
 			{
 			RECT rect;
 			//SetWindowPos(hwnd,HWND_TOP,0,0,sw/2,sh/2,0);
 			SetWindowPos(hwnd,HWND_TOP,0,0,sw/(2+4),sh/(2+4),SWP_NOZORDER);
+			restore_window(hwnd,"MAIN_WINDOW");
 
 			GetClientRect(hwnd,&rect);
 			screenw=rect.right-rect.left;
@@ -586,9 +594,14 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			}
 			SetTimer(hwnd,1000,60,NULL);
 			move_console(0,sh/2);
-
 		}
         return 0;
+	case WM_APP:
+		switch(wparam){
+		case 1:
+			restore_scroll(GetDlgItem(heditwin,IDC_EDIT1),"EDITOR");
+			break;
+		}
 	case WM_TIMER:
 		InvalidateRect(hwnd,NULL,FALSE);
 		return 0;
@@ -677,6 +690,8 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		}
 		break;
 	case WM_CLOSE:
+		SendMessage(heditwin,WM_CLOSE,0,0);
+		save_window_pos(hwnd,"MAIN_WINDOW");
 		exit(0);
 		break;
 	}
@@ -713,6 +728,8 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 	HACCEL haccel;
 	ghinstance=hInstance;
 	LoadLibrary("RICHED32.DLL");
+	GetCurrentDirectory(sizeof(start_dir),start_dir);
+	init_ini_file();
 	open_console();
 	//create_view(hInstance);
 	hview=CreateDialog(hInstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),NULL,WndProc);

@@ -156,7 +156,6 @@ float PrintValue(const in vec2 vPixelCoords, const in vec2 vFontSize, const in f
 {
 	return PrintValue((gl_FragCoord.xy - vPixelCoords) / vFontSize, fValue, fMaxDigits, fDecimalPlaces);
 }
-
 float sphere(vec3 ray, vec3 dir, vec3 center, float radius)
 {
 	vec3 rc = ray-center;
@@ -184,6 +183,20 @@ float calc(vec3 ro,vec3 dir,vec3 center,float radius)
 	return result;
 }
 
+float sdSphere(vec3 p, vec3 c,float r)
+{
+	return length(p-c)-r;
+}
+float sdBox(vec3 p, vec3 b)
+{	
+	vec3 d = abs(p) - b;
+	return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
+}
+float sdTorus(vec3 p, vec2 t)
+{
+  vec2 q = vec2(length(p.xy)-t.x,p.z);
+  return length(q)-t.y;
+}
 void main(void)
 {
 	vec2 vFontSize = vec2(8.0, 15.0);
@@ -191,21 +204,30 @@ void main(void)
 	vec3 ro = vec3(uv, iMouse.x/10);
 	vec3 rd = normalize(vec3(1,34, -30));
 	vec3 center = vec3(1.0, 1.90, 1.0);
-	float t;
 	vec3 dir=vec3(0,0,0);
 	vec3 march = 0;
+	vec3 col =  vec3(0., .5, 0);
 	int i;
-	for(i=0;i<100;i++){
-		march=ro+((float)i/10.0);
-		t=calc(march,dir,center,7);
-		if(t>0)
+	float dist=0;
+	float t=0;
+	ro.z+=3;
+	for(i=0;i<1000;i++){
+		//dist=sdBox(ro-vec3(10,10,10),vec3(10,10,10));
+
+		dist=sdSphere(ro,vec3(0,0,-46),50);
+		if(dist<.1){
+			t=1;
 			break;
+				
+		}
+		ro=ro+dist;
+//		dist
 		
 	}
-	
-	float val = PrintValue(vec2(10,10), vFontSize , iMouse.x, 4.0, 2.0);
+	vec3 test=vec3(0,0,0);
+	test+=(4,1,7);
+	float val = PrintValue(vec2(10,10), vFontSize ,iMouse.x, 4.0, 2.0);
 
-	vec3 col =  vec3(0., .5, 0);
 	col=mix(0, col, t);
 	col+=vec3(val*9,0,0);
 	gl_FragColor = vec4(col , 1.0 );

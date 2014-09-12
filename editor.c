@@ -1,3 +1,5 @@
+#define WINVER 0x500
+#define _WIN32_WINNT 0x500
 #include <windows.h>
 #include <stdio.h>
 #include <math.h>
@@ -42,6 +44,91 @@ int update_status(HWND hedit,HWND hstatus)
 	SetWindowText(hstatus,str);
 	return TRUE;
 }
+int find_next_word(HWND hedit,char *str,int up)
+{
+	FINDTEXT ftext;
+	int fpos,dir,pos=0,end=0;
+	SendMessage(hedit,EM_GETSEL,&pos,&end);
+	dir=0;
+	if(up){
+		ftext.chrg.cpMax=0;
+		if(pos>0)
+			pos--;
+	}
+	else{
+		ftext.chrg.cpMax=-1;
+		dir=FR_DOWN;
+		pos++;
+	}
+	ftext.lpstrText=str;
+	ftext.chrg.cpMin=pos;
+	fpos=SendMessage(hedit,EM_FINDTEXT,dir,&ftext);
+	if(fpos>0){
+		SendMessage(hedit,EM_SETSEL,fpos,fpos);
+		SendMessage(hedit,EM_SCROLLCARET,0,0);
+	}
+	return 0;
+}
+int seek_start(char *str,int start)
+{
+	int result=-1;
+	int pos=start;
+	char c;
+	c=str[pos];
+	if(isalnum(c)){
+		while(pos>=0){
+			c=str[pos];
+			if(isalnum(c)){
+				result=pos;
+			}
+			else
+				break;
+			pos--;
+		};
+	}
+	return result;
+}
+int word_len(char *str)
+{
+	int i=0;
+	while(str[i]){
+		if(!isalnum(str[i]))
+			break;
+		i++;
+	}
+	return i;
+}
+int get_word(HWND hedit,int charpos,char *str,int size)
+{
+	int result=FALSE;
+	int line=SendMessage(hedit,EM_EXLINEFROMCHAR,0,charpos);
+	if(line>=0){
+		int index=SendMessage(hedit,EM_LINEINDEX,line,0);
+		if(index>=0){
+			int pos=charpos-index;
+			int tmp_size=0x8000;
+			char *tmp=calloc(tmp_size,1);
+			if(tmp && pos>=0){
+				int start,count=0;
+				((short*)tmp)[0]=tmp_size;
+				SendMessage(hedit,EM_GETLINE,line,tmp);
+				start=seek_start(tmp,pos);
+				if(start>=0){
+					char *s=tmp+start;
+					int end=word_len(s);
+					s[end]=0;
+					//printf("[%s]\n(end=%i)\n",s,end);
+					strncpy(str,s,size);
+					str[size-1]=0;
+					result=TRUE;
+				}
+				free(tmp);
+			}
+		}
+	}
+	return result;
+}
+static char search_text[80]={0};
 LRESULT CALLBACK find_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	static HWND hedit=0;
@@ -49,7 +136,6 @@ LRESULT CALLBACK find_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	FINDTEXT ftext;
 	int pos,dir,fpos;
 	static int fontheight=0,timer=0,last_search_pos=0,last_dir=0,at_top=FALSE;
-	static char search_text[80]={0};
 
 	switch(msg){
 	case WM_INITDIALOG:
@@ -62,8 +148,10 @@ LRESULT CALLBACK find_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				SendMessage(hedit,WM_COPY,0,0);
 				SendMessage(GetDlgItem(hwnd,IDC_SEARCH_BOX),WM_PASTE,0,0);
 			}
-			else
+			else{
+				get_word(hedit,start,search_text,sizeof(search_text));
 				SetDlgItemText(hwnd,IDC_SEARCH_BOX,search_text);
+			}
 			{
 				HDC hdc;
 				hdc=GetDC(hedit);
@@ -255,6 +343,21 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		break;
 	case WM_KEYDOWN:
 		switch(wparam){
+		case VK_TAB:
+			if(GetKeyState(VK_CONTROL)&0x8000){
+				SetFocus(GetDlgItem(GetParent(hwnd),IDC_SETTINGS));
+				return 0;
+			}
+			else if(GetKeyState(VK_SHIFT)&0x8000){
+				PostMessage(hwnd,WM_KEYDOWN,VK_BACK,0);
+				PostMessage(hwnd,WM_KEYDOWN,VK_BACK,0);
+			}
+			break;
+		case VK_F3:
+			if(search_text[0]!=0){
+				find_next_word(hwnd,search_text,GetKeyState(VK_SHIFT)&0x8000);
+			}
+			break;
 		case 'F':
 			if(GetKeyState(VK_CONTROL)&0x8000)
 				DialogBoxParam(ghinstance,MAKEINTRESOURCE(IDD_FIND),hwnd,find_proc,hwnd);	
@@ -268,7 +371,113 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	}
 	return CallWindowProc(orig_edit,hwnd,msg,wparam,lparam); 
 }
-
+int set_window_pos(HWND hwnd,int x,int y,int w,int h,int max)
+{
+	int result=FALSE;
+	HMONITOR hmon;
+	MONITORINFO mi;
+	RECT rect;
+	rect.left=x;
+	rect.top=y;
+	rect.right=x+w;
+	rect.bottom=y+h;
+	hmon=MonitorFromRect(&rect,MONITOR_DEFAULTTONEAREST);
+	mi.cbSize=sizeof(mi);
+	if(GetMonitorInfo(hmon,&mi)){
+		rect=mi.rcWork;
+		if(x>(rect.right-25) || x<(rect.left-25)
+			|| y<(rect.top-25) || y>(rect.bottom-25))
+			;
+		else{
+			if(w>0 && h>0){
+				int flags=SWP_NOZORDER;
+				if(max)
+					flags|=SW_MAXIMIZE;
+				SetWindowPos(hwnd,HWND_TOP,x,y,w,h,flags);
+				result=TRUE;
+			}
+		}
+	}
+	return result;
+}
+int restore_scroll(HWND hedit,const char *WINDOW_NAME)
+{
+	int x=0,y=0,a=0,b=0;
+	SCROLLINFO si={0};
+	get_ini_value(WINDOW_NAME,"scrollx",&x);
+	get_ini_value(WINDOW_NAME,"scrolly",&y);
+	get_ini_value(WINDOW_NAME,"select_start",&a);
+	get_ini_value(WINDOW_NAME,"select_end",&b);
+	si.cbSize=sizeof(SCROLLINFO);
+	si.fMask=SIF_POS;
+	si.nPos=y;
+	SetScrollInfo(hedit,SB_VERT,&si,TRUE);
+	si.nPos=x;
+	SetScrollInfo(hedit,SB_HORZ,&si,TRUE);
+	SendMessage(hedit,EM_SETSEL,a,b);
+	return TRUE;
+}
+int restore_window(HWND hwnd,const char *WINDOW_NAME)
+{
+	int result=FALSE;
+	int x=-100,y=-100,w=0,h=0,max=0;
+	get_ini_value(WINDOW_NAME,"xpos",&x);
+	get_ini_value(WINDOW_NAME,"ypos",&y);
+	get_ini_value(WINDOW_NAME,"width",&w);
+	get_ini_value(WINDOW_NAME,"height",&h);
+	get_ini_value(WINDOW_NAME,"maximized",&max);
+	return set_window_pos(hwnd,x,y,w,h,max);
+}
+int save_window_pos(HWND hwnd,const char *WINDOW_NAME)
+{
+	int result=FALSE;
+	RECT rect={0};
+	WINDOWPLACEMENT wp;
+	if(GetWindowPlacement(hwnd,&wp)!=0){
+		int w,h,maximized=0;
+		rect=wp.rcNormalPosition;
+		if(wp.flags&WPF_RESTORETOMAXIMIZED)
+			maximized=1;
+		w=rect.right-rect.left;
+		h=rect.bottom-rect.top;
+		write_ini_value(WINDOW_NAME,"width",w);
+		write_ini_value(WINDOW_NAME,"height",h);
+		write_ini_value(WINDOW_NAME,"xpos",rect.left);
+		write_ini_value(WINDOW_NAME,"ypos",rect.top);
+		write_ini_value(WINDOW_NAME,"maximized",maximized);
+		result=TRUE;
+	}
+	return result;
+}
+int save_scroll_pos(HWND hwnd,const char *WINDOW_NAME)
+{
+	int x=0,y=0,a=0,b=0;
+	SCROLLINFO si={0};
+	si.cbSize=sizeof(SCROLLINFO);
+	si.fMask=SIF_POS;
+	GetScrollInfo(hwnd,SB_VERT,&si);
+	y=si.nPos;
+	GetScrollInfo(hwnd,SB_HORZ,&si);
+	x=si.nPos;
+	SendMessage(hwnd,EM_GETSEL,&a,&b);
+	write_ini_value(WINDOW_NAME,"scrollx",x);
+	write_ini_value(WINDOW_NAME,"scrolly",y);
+	write_ini_value(WINDOW_NAME,"select_start",a);
+	write_ini_value(WINDOW_NAME,"select_end",b);
+	return TRUE;
+}
+int get_twipsx(float *x)
+{
+	HDC hdc;
+	hdc=GetDC(HWND_DESKTOP);
+	if(hdc){
+		float f;
+		f=GetDeviceCaps(hdc,LOGPIXELSY);
+		*x=1440/f;
+		ReleaseDC(HWND_DESKTOP,hdc);
+	}
+	return TRUE;
+}
 
 LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
@@ -277,11 +486,29 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		orig_edit=SetWindowLong(GetDlgItem(hwnd,IDC_EDIT1),GWL_WNDPROC,subclass_edit);
 		SendDlgItemMessage(hwnd,IDC_EDIT1,WM_SETFONT,GetStockObject(ANSI_FIXED_FONT),0);
 		SendDlgItemMessage(hwnd,IDC_EDIT1,EM_SETEVENTMASK,0,ENM_CHANGE);
+		{
+			float twipsx=0;
+			get_twipsx(&twipsx);
+			if(twipsx>0){
+				int i,x;
+				PARAFORMAT pf={0};
+				pf.cbSize=sizeof(PARAFORMAT);
+				pf.dwMask=PFM_TABSTOPS;
+				x=twipsx*8*4;
+				for(i=0;i<MAX_TAB_STOPS;i++){
+					pf.rgxTabs[i]=x*i;
+				}
+				pf.cTabCount=i;
+				SendDlgItemMessage(hwnd,IDC_EDIT1,EM_SETPARAFORMAT,0,&pf);
+			}
+		}
 		break;
 	case WM_HELP:
 		//MessageBox(
 		break;
 	case WM_CLOSE:
+		save_window_pos(hwnd,"EDITOR");
+		save_scroll_pos(GetDlgItem(hwnd,IDC_EDIT1),"EDITOR");
 		ShowWindow(hwnd,SW_HIDE);
 		return 0;
 	case WM_COMMAND:

@@ -567,6 +567,22 @@ int toggle_window_size(HWND hwnd)
 	*/
 	return TRUE;
 }
+int populate_sample_list(HWND hlist,int cur_sel)
+{
+	int i=0;
+	if(hlist){
+		SendMessage(hlist,CB_RESETCONTENT,0,0);
+		while(samples[i]){
+			char str[80];
+			_snprintf(str,sizeof(str),"sample%i",i+1);
+			SendMessage(hlist,CB_ADDSTRING,0,str);
+			i++;
+		}
+		SendMessage(hlist,CB_SETCURSEL,cur_sel,0);
+	}
+	return i;
+}
+
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	static HWND hedit=0;
@@ -585,13 +601,10 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				i=SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,lf.lfFaceName);
 				SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
 			}
+			populate_sample_list(GetDlgItem(hwnd,IDC_SAMPLELIST),src_sample);
+			SendDlgItemMessage(hwnd,IDC_SAMPLELIST,CB_SETCURSEL,src_sample,0);
 			if(load_preamble)
 				SendDlgItemMessage(hwnd,IDC_LOAD_PREAMBLE,BM_SETCHECK,BST_CHECKED,0);
-			{
-				char str[40];
-				sprintf(str,"load sample (%i)",src_sample+1);
-				SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,str);
-			}
 		}
 		break;
 	case WM_COMMAND:
@@ -612,20 +625,26 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			else
 				load_preamble=FALSE;
 			break;
-		case IDC_LOAD_SAMPLE:
-			if(HIWORD(wparam)==BN_CLICKED){
-				char *str;
-				str=samples[++src_sample];
-				if(str==0){
-					src_sample=0;
-					str=samples[src_sample];
-				}
-				load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
-				compile(heditwin);
-				{
-					char tmp[40];
-					sprintf(tmp,"load sample (%i)",src_sample+1);
-					SetDlgItemText(hwnd,IDC_LOAD_SAMPLE,tmp);
+		case IDC_OPENINI:
+			{
+				int explore=FALSE;
+				if((GetKeyState(VK_SHIFT)&0x8000) || (GetKeyState(VK_CONTROL)&0x8000))
+					explore=TRUE;
+				open_ini(hwnd,explore);
+			}
+			break;
+		case IDC_SAMPLELIST:
+			{
+				HWND hlist=lparam;
+				if(HIWORD(wparam)==CBN_SELCHANGE){
+					int index=SendMessage(hlist,CB_GETCURSEL,0,0);
+					if(index>=0){
+						char *str;
+						src_sample=index;
+						str=samples[src_sample];
+						load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
+						compile(heditwin);
+					}
 				}
 			}
 			break;
