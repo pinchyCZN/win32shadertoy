@@ -690,8 +690,10 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		}
 		break;
 	case WM_CLOSE:
-		SendMessage(heditwin,WM_CLOSE,0,0);
-		save_window_pos(hwnd,"MAIN_WINDOW");
+		if(! ((GetKeyState(VK_CONTROL)&0x8000) || (GetKeyState(VK_SHIFT)&0x8000)) ){
+			SendMessage(heditwin,WM_CLOSE,0,0);
+			save_window_pos(hwnd,"MAIN_WINDOW");
+		}
 		exit(0);
 		break;
 	}
