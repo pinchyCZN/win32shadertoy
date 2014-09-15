@@ -189,8 +189,12 @@ float sdSphere(vec3 p, vec3 c,float r)
 }
 float sdBox(vec3 p, vec3 b)
 {	
-	vec3 d = abs(p) - b;
-	return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
+	float f;
+	vec3 c=cross(p,b);
+	vec3 d = abs(p) - abs(c);
+	f=min(max(d.x,max(d.y,d.z)),0.0);
+	f += length(max(d,0));
+	return f;
 }
 float sdTorus(vec3 p, vec2 t)
 {
@@ -214,20 +218,35 @@ void main(void)
 	for(i=0;i<1000;i+=10){
 		//dist=sdBox(ro-vec3(10,10,10),vec3(10,10,10));
 
-/*
-		dist=sdSphere(ro,vec3(0,0,-46),50);
-		if(dist>=0 && dist<.1){
-			t=1;
+		vec3 obj=vec3(0,0,10);
+		vec3 light=vec3(10,10,-10);
+
+		dist=sdSphere(ro,obj,60);
+		if(dist>0 && dist<.1){
+			obj=sin(length(cross(ro,light))/900);
+			
+			t=length(obj);
 			break;
 				
 		}
-*/
+
+/*
 		dist=sdTorus(ro,vec2(50,17));
 		if(dist>=0 && dist<.1){
 			t=1;
 			break;
 				
 		}
+*/
+
+/*
+		dist=sdBox(ro,vec3(11,11.0,100.0));
+		if(dist>=0 && dist<2.01){
+			t=dist;
+			break;
+				
+		}
+*/
 		ro=ro+dist;
 //		dist
 		
