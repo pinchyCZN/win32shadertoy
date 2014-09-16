@@ -205,27 +205,29 @@ void main(void)
 {
 	vec2 vFontSize = vec2(8.0, 15.0);
 	vec2 uv = gl_FragCoord.xy - (iResolution.xy/2);
-	vec3 ro = vec3(uv, iMouse.x/10);
-	vec3 rd = normalize(vec3(1,34, -30));
+	vec3 ro = vec3(0,0, -30+iMouse.x/10);
+	vec3 rd = vec3(uv, 0);
 	vec3 center = vec3(1.0, 1.90, 1.0);
 	vec3 dir=vec3(0,0,0);
-	vec3 march = 0;
 	vec3 col =  vec3(0., .5, 0);
 	float i;
 	float dist=0;
 	float t=0;
-	ro.z+=3;
+	vec3 ray=rd;	
 	for(i=0;i<1000;i+=10){
 		//dist=sdBox(ro-vec3(10,10,10),vec3(10,10,10));
 
-		vec3 obj=vec3(0,0,10);
+		vec3 obj=vec3(0,0,100);
 		vec3 light=vec3(10,10,-10);
 
-		dist=sdSphere(ro,obj,60);
-		if(dist>0 && dist<.1){
+		dist=sdSphere(ray-ro,obj-ro,60);
+		float d;
+		d=sqrt(dist);
+		if(d>0 && d<.1){
 			obj=sin(length(cross(ro,light))/900);
 			
 			t=length(obj);
+			t=1;
 			break;
 				
 		}
@@ -247,12 +249,12 @@ void main(void)
 				
 		}
 */
-		ro=ro+dist;
-//		dist
+		ray=ray+dist;
+
 		
 	}
-	vec3 test=vec3(0,0,0);
-	test+=(4,1,7);
+	vec3 test=vec3(1,2,3);
+	test+=4; //(4,1,7);
 	float val = PrintValue(vec2(10,10), vFontSize ,iMouse.x, 4.0, 2.0);
 
 	col=mix(0, col, t);
