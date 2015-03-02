@@ -192,10 +192,6 @@ SOURCE=.\tjpgd.c
 
 SOURCE=.\pragma.h
 # End Source File
-# Begin Source File
-
-SOURCE=.\sample.h
-# End Source File
 # End Group
 # Begin Group "Resource Files"
 
