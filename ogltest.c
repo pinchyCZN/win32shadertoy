@@ -238,7 +238,7 @@ int set_vars(GLuint p)
 		f[0]=screenw;
 		f[1]=screenh;
 		f[2]=0;
-		glProgramUniform3fv(p,loc,1,&f);
+		glProgramUniform3fv(p,loc,1,f);
 		e=glGetError();
 		if(GL_NO_ERROR!=e)
 			printf("error setting resolution of %i,%i error=0x%04X\n",screenw,screenh,e);
