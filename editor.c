@@ -307,7 +307,7 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	switch(msg){
 	case WM_APP:
 		{
-			int maxlen=0x200000;
+			int maxlen=0x300000;
 			char *buf=malloc(maxlen);
 			edit_busy=TRUE;
 			if(buf){
@@ -486,6 +486,7 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		orig_edit=SetWindowLong(GetDlgItem(hwnd,IDC_EDIT1),GWL_WNDPROC,subclass_edit);
 		SendDlgItemMessage(hwnd,IDC_EDIT1,WM_SETFONT,GetStockObject(ANSI_FIXED_FONT),0);
 		SendDlgItemMessage(hwnd,IDC_EDIT1,EM_SETEVENTMASK,0,ENM_CHANGE);
+		SendDlgItemMessage(hwnd,IDC_EDIT1,EM_LIMITTEXT,0,0);
 		{
 			float twipsx=0;
 			get_twipsx(&twipsx);
