@@ -239,7 +239,7 @@ int set_vars(GLuint p)
 		f[0]=screenw;
 		f[1]=screenh;
 		f[2]=0;
-		glProgramUniform3fv(p,loc,1,&f);
+		glProgramUniform3fv(p,loc,1,f);
 		e=glGetError();
 		if(GL_NO_ERROR!=e)
 			printf("error setting resolution of %i,%i error=0x%04X\n",screenw,screenh,e);
@@ -465,7 +465,9 @@ int insert_preamble(HWND hedit,char *buf,int len)
 	if(memcmp(buf,pre,prelen)!=0){
 		int start=0,end=0;
 		char *tmp;
-		int size=0x10000;
+		int size=len;
+		if(size<0 || size>0xA00000)
+			size=0xA00000;
 		tmp=malloc(size);
 		if(tmp && len>0){
 			_snprintf(tmp,size,"%s\r\n%s",pre,buf);
