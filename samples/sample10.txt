@@ -1,410 +1,316 @@
-// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// Created by Reinder Nijhoff 2013
+//
+// based on: http://www.iquilezles.org/www/articles/simplepathtracing/simplepathtracing.htm
+//
 
-const float tau = 6.28318530717958647692;
+#define MOTIONBLUR
+#define DEPTHOFFIELD
 
-// Gamma correction
-#define GAMMA (2.2)
+#define CUBEMAPSIZE 256
 
-vec3 ToLinear( in vec3 col )
-{
-	// simulate a monitor, converting colour values into light values
-	return pow( col, vec3(GAMMA) );
+#define SAMPLES 8
+#define PATHDEPTH 4
+#define TARGETFPS 60.
+
+#define FOCUSDISTANCE 17.
+#define FOCUSBLUR 0.25
+
+#define RAYCASTSTEPS 20
+#define RAYCASTSTEPSRECURSIVE 2
+
+#define EPSILON 0.001
+#define MAXDISTANCE 180.
+#define GRIDSIZE 8.
+#define GRIDSIZESMALL 5.9
+#define MAXHEIGHT 10.
+#define SPEED 0.5
+
+float time = iGlobalTime;
+
+//
+// math functions
+//
+
+float hash( const float n ) {
+	return fract(sin(n)*43758.54554213);
 }
-
-vec3 ToGamma( in vec3 col )
-{
-	// convert back into colour values, so the correct light will come out of the monitor
-	return pow( col, vec3(1.0/GAMMA) );
+vec2 hash2( const float n ) {
+	return fract(sin(vec2(n,n+1.))*vec2(43758.5453123));
 }
-
-vec3 localRay;
-
-// Set up a camera looking at the scene.
-// origin - camera is positioned relative to, and looking at, this point
-// distance - how far camera is from origin
-// rotation - about x & y axes, by left-hand screw rule, relative to camera looking along +z
-// zoom - the relative length of the lens
-void CamPolar( out vec3 pos, out vec3 ray, in vec3 origin, in vec2 rotation, in float distance, in float zoom )
-{
-	// get rotation coefficients
-	vec2 c = vec2(cos(rotation.x),cos(rotation.y));
-	vec4 s;
-	s.xy = vec2(sin(rotation.x),sin(rotation.y)); // worth testing if this is faster as sin or sqrt(1.0-cos);
-	s.zw = -s.xy;
-
-	// ray in view space
-	ray.xy = gl_FragCoord.xy - iResolution.xy*.5;
-	ray.z = iResolution.y*zoom;
-	ray = normalize(ray);
-	localRay = ray;
-	
-	// rotate ray
-	ray.yz = ray.yz*c.xx + ray.zy*s.zx;
-	ray.xz = ray.xz*c.yy + ray.zx*s.yw;
-	
-	// position camera
-	pos = origin - distance*vec3(c.x*s.y,s.z,c.x*c.y);
+vec2 hash2( const vec2 n ) {
+	return fract(sin(vec2( n.x*n.y, n.x+n.y))*vec2(25.1459123,312.3490423));
 }
-
-
-// Noise functions, distinguished by variable types
-
-vec2 Noise( in vec3 x )
-{
-    vec3 p = floor(x);
-    vec3 f = fract(x);
-	f = f*f*(3.0-2.0*f);
-//	vec3 f2 = f*f; f = f*f2*(10.0-15.0*f+6.0*f2);
-
-	vec2 uv = (p.xy+vec2(37.0,17.0)*p.z) + f.xy;
-
-// hardware interpolation lacks precision
-//	vec4 rg = texture2D( iChannel0, (uv+0.5)/256.0, -100.0 );
-	vec4 rg = mix( mix(
-				texture2D( iChannel0, (floor(uv)+0.5)/256.0, -100.0 ),
-				texture2D( iChannel0, (floor(uv)+vec2(1,0)+0.5)/256.0, -100.0 ),
-				fract(uv.x) ),
-				  mix(
-				texture2D( iChannel0, (floor(uv)+vec2(0,1)+0.5)/256.0, -100.0 ),
-				texture2D( iChannel0, (floor(uv)+1.5)/256.0, -100.0 ),
-				fract(uv.x) ),
-				fract(uv.y) );
-				  
-
-	return mix( rg.yw, rg.xz, f.z );
+vec3 hash3( const vec2 n ) {
+	return fract(sin(vec3(n.x, n.y, n+2.0))*vec3(36.5453123,43.1459123,11234.3490423));
 }
+//
+// intersection functions
+//
 
-vec4 Noise( in vec2 x )
-{
-    vec2 p = floor(x.xy);
-    vec2 f = fract(x.xy);
-	f = f*f*(3.0-2.0*f);
-//	vec3 f2 = f*f; f = f*f2*(10.0-15.0*f+6.0*f2);
-
-	vec2 uv = p.xy + f.xy;
-	return texture2D( iChannel0, (uv+0.5)/256.0, -100.0 );
-}
-
-vec4 Noise( in ivec2 x )
-{
-	return texture2D( iChannel0, (vec2(x)+0.5)/256.0, -100.0 );
-}
-
-vec2 Noise( in ivec3 x )
-{
-	vec2 uv = vec2(x.xy)+vec2(37.0,17.0)*float(x.z);
-	return texture2D( iChannel0, (uv+0.5)/256.0, -100.0 ).xz;
-}
-
-
-float Waves( vec3 pos )
-{
-	pos *= .2*vec3(1,1,1);
-	
-	const int octaves = 6;
-	float f = 0.0;
-
-	// need to do the octaves from large to small, otherwise things don't line up
-	// (because I rotate by 45 degrees on each octave)
-		pos += iGlobalTime*vec3(0,.1,.1);
-	for ( int i=0; i < octaves; i++ )
-	{
-		pos = (pos.yzx + pos.zyx*vec3(1,-1,1))/sqrt(2.0);
-		f  = f*2.0+abs(Noise(pos).x-.5)*2.0;
-		pos *= 2.0;
+float intersectPlane( const vec3 ro, const vec3 rd, const float height) {	
+	if (rd.y==0.0) return 500.;	
+	float d = -(ro.y - height)/rd.y;
+	if( d > 0. ) {
+		return d;
 	}
-	f /= exp2(float(octaves));
-	
-	return (.5-f)*1.0;
+	return 500.;
 }
 
-float WavesDetail( vec3 pos )
-{
-	pos *= .2*vec3(1,1,1);
-	
-	const int octaves = 8;
-	float f = 0.0;
+float intersectUnitSphere ( const vec3 ro, const vec3 rd, const vec3 sph ) {
+	vec3  ds = ro - sph;
+	float bs = dot( rd, ds );
+	float cs = dot( ds, ds ) - 1.0;
+	float ts = bs*bs - cs;
 
-	// need to do the octaves from large to small, otherwise things don't line up
-	// (because I rotate by 45 degrees on each octave)
-		pos += iGlobalTime*vec3(0,.1,.1);
-	for ( int i=0; i < octaves; i++ )
-	{
-		pos = (pos.yzx + pos.zyx*vec3(1,-1,1))/sqrt(2.0);
-		f  = f*2.0+abs(Noise(pos).x-.5)*2.0;
-		pos *= 2.0;
+	if( ts > 0.0 ) {
+		ts = -bs - sqrt( ts );
+		if( ts > 0. ) {
+			return ts;
+		}
 	}
-	f /= exp2(float(octaves));
-	
-	return (.5-f)*1.0;
+	return 500.;
 }
 
-float WavesSmooth( vec3 pos )
-{
-	pos *= .2*vec3(1,1,1);
-	
-	const int octaves = 2;
-	float f = 0.0;
+//
+// Scene
+//
 
-	// need to do the octaves from large to small, otherwise things don't line up
-	// (because I rotate by 45 degrees on each octave)
-		pos += iGlobalTime*vec3(0,.1,.1);
-	for ( int i=0; i < octaves; i++ )
-	{
-		pos = (pos.yzx + pos.zyx*vec3(1,-1,1))/sqrt(2.0);
-		//f  = f*2.0+abs(Noise(pos).x-.5)*2.0;
-		f  = f*2.0+sqrt(pow(Noise(pos).x-.5,2.0)+.01)*2.0;
-		pos *= 2.0;
+void getSphereOffset( const vec2 grid, out vec2 center ) {
+	center = (hash2( grid+vec2(43.12,1.23) ) - vec2(0.5) )*(GRIDSIZESMALL);
+}
+void getMovingSpherePosition( const vec2 grid, const vec2 sphereOffset, out vec3 center ) {
+	// falling?
+	float s = 0.1+hash( grid.x*1.23114+5.342+74.324231*grid.y );
+	float t = 14.*s + time/s;
+	
+	float y =  s * MAXHEIGHT * abs( cos( t ) );
+	vec2 offset = grid + sphereOffset;
+	
+	center = vec3( offset.x, y, offset.y ) + 0.5*vec3( GRIDSIZE, 2., GRIDSIZE );
+}
+void getSpherePosition( const vec2 grid, const vec2 sphereOffset, out vec3 center ) {
+	vec2 offset = grid + sphereOffset;
+	center = vec3( offset.x, 0., offset.y ) + 0.5*vec3( GRIDSIZE, 2., GRIDSIZE );
+}
+vec3 getSphereColor( const vec2 grid ) {
+	return 0.8*normalize( hash3( grid+vec2(43.12*grid.y,12.23*grid.x) ) );
+}
+
+vec3 sundir = normalize( vec3(-1.0,0.8,0.2) );
+
+vec3 getBackgroundColor( const vec3 ro, const vec3 rd ) {	
+	return vec3( 0.8, 0.9, 1.0 ) * (1.8 * (rd.y+0.5) );
+}
+
+// code duplication because the for-loop requires a const
+vec3 traceRec( const vec3 ro, const vec3 rd, out vec3 intersection, out vec3 normal, out float dist, out int material) {
+	dist = MAXDISTANCE;
+	float distcheck;
+	
+	vec3 sphereCenter, col;
+
+	material = 0;	
+	col = getBackgroundColor(ro, rd);
+	
+	if( (distcheck = intersectPlane( ro,  rd, 0.)) < MAXDISTANCE ) {
+		dist = distcheck;
+		material = 1;
+		normal = vec3( 0., 1., 0. );
+		col = vec3( 0.5 );
 	}
-	f /= exp2(float(octaves));
 	
-	return (.5-f)*1.0;
-}
-
-float WaveCrests( vec3 ipos )
-{
-	vec3 pos = ipos;
-	pos *= .2*vec3(1,1,1);
+	// trace grid
+	vec3 pos = floor(ro/GRIDSIZE)*GRIDSIZE;
+	vec3 ri = 1.0/rd;
+	vec3 rs = sign(rd) * GRIDSIZE;
+	vec3 dis = (pos-ro + 0.5  * GRIDSIZE + rs*0.5) * ri;
+	vec3 mm = vec3(0.0);
+	vec2 offset;
 	
-	const int octaves1 = 6;
-	const int octaves2 = 16;
-	float f = 0.0;
-
-	// need to do the octaves from large to small, otherwise things don't line up
-	// (because I rotate by 45 degrees on each octave)
-	pos += iGlobalTime*vec3(0,.1,.1);
-	vec3 pos2 = pos;
-	for ( int i=0; i < octaves1; i++ )
-	{
-		pos = (pos.yzx + pos.zyx*vec3(1,-1,1))/sqrt(2.0);
-		f  = f*1.5+abs(Noise(pos).x-.5)*2.0;
-		pos *= 2.0;
+	for( int i=0; i<RAYCASTSTEPSRECURSIVE; i++ ) {
+		if( material == 2 ) break; {		
+			getSphereOffset( pos.xz, offset );			
+			
+			getMovingSpherePosition( pos.xz, -offset, sphereCenter );			
+			if( (distcheck = intersectUnitSphere( ro, rd, sphereCenter )) < dist ) {
+				dist = distcheck;
+				normal = normalize((ro+rd*dist)-sphereCenter);
+				col = getSphereColor(pos.xz);
+				material = 2;
+			}
+			
+			getSpherePosition( pos.xz, offset, sphereCenter );
+			if( (distcheck = intersectUnitSphere( ro, rd, sphereCenter )) < dist ) {
+				dist = distcheck;
+				normal = normalize((ro+rd*dist)-sphereCenter);
+				col = getSphereColor(pos.xz+vec2(1.,2.));
+				material = 2;
+			}
+			
+			mm = step(dis.xyz, dis.zyx);
+			dis += mm * rs * ri;
+			pos += mm * rs;	
+		}
 	}
-	pos = pos2 * exp2(float(octaves1));
-	pos.y = -.05*iGlobalTime;
-	for ( int i=octaves1; i < octaves2; i++ )
-	{
-		pos = (pos.yzx + pos.zyx*vec3(1,-1,1))/sqrt(2.0);
-		f  = f*1.5+pow(abs(Noise(pos).x-.5)*2.0,1.0);
-		pos *= 2.0;
-	}
-	f /= 1500.0;
 	
-	f -= Noise(ivec2(gl_FragCoord.xy)).x*.01;
-	
-	return pow(smoothstep(.4,-.1,f),6.0);
-}
-
-
-vec3 Sky( vec3 ray )
-{
-	return vec3(.4,.45,.5);
-}
-
-
-vec3 boatRight, boatUp, boatForward;
-vec3 boatPosition;
-
-void ComputeBoatTransform( void )
-{
-	vec3 samples[5];
-	
-	samples[0] = vec3(0,0, 0);
-	samples[1] = vec3(0,0, .5);
-	samples[2] = vec3(0,0,-.5);
-	samples[3] = vec3( .5,0,0);
-	samples[4] = vec3(-.5,0,0);
-	
-	samples[0].y = WavesSmooth(samples[0]);
-	samples[1].y = WavesSmooth(samples[1]);
-	samples[2].y = WavesSmooth(samples[2]);
-	samples[3].y = WavesSmooth(samples[3]);
-	samples[4].y = WavesSmooth(samples[4]);
-
-	boatPosition = (samples[0]+samples[1]+samples[2]+samples[3]+samples[4])/5.0;
-	
-	boatRight = samples[3]-samples[4];
-	boatForward = samples[1]-samples[2];
-	boatUp = normalize(cross(boatForward,boatRight));
-	boatRight = normalize(cross(boatUp,boatForward));
-	boatForward = normalize(boatForward);
-	
-	boatPosition += .0*boatUp;
-}
-
-vec3 BoatToWorld( vec3 dir )
-{
-	return dir.x*boatRight+dir.x*boatUp+dir.x*boatForward;
-}
-
-vec3 WorldToBoat( vec3 dir )
-{
-	return vec3( dot(dir,boatRight), dot(dir,boatUp), dot(dir,boatForward) );
-}
-
-float TraceBoat( vec3 pos, vec3 ray )
-{
-	vec3 c = boatPosition;
-	float r = 1.0;
-	
-	c -= pos;
-	
-	float t = dot(c,ray);
-	
-	float p = length(c-t*ray);
-	if ( p > r )
-		return 0.0;
-	
-	return t-sqrt(r*r-p*p);
-}
-
-
-vec3 ShadeBoat( vec3 pos, vec3 ray )
-{
-	pos -= boatPosition;
-	vec3 norm = normalize(pos);
-	pos = WorldToBoat(pos);
-	
-	vec3 lightDir = normalize(vec3(-2,3,1));
-	float ndotl = dot(norm,lightDir);
-	
-	// allow some light bleed, as if it's subsurface scattering through plastic
-	vec3 light = smoothstep(-.1,1.0,ndotl)*vec3(1.0,.9,.8)+vec3(.06,.1,.1);
-
-	// anti-alias the albedo
-	float aa = 4.0/iResolution.x;
-	
-	//vec3 albedo = ((fract(pos.x)-.5)*(fract(pos.y)-.5)*(fract(pos.z)-.5) < 0.0) ? vec3(0) : vec3(1);
-	vec3 albedo = vec3(1,.01,0);
-	albedo = mix( vec3(.04), albedo, smoothstep( .25-aa, .25, abs(pos.y) ) );
-	albedo = mix( mix( vec3(1), vec3(.04), smoothstep(-aa*4.0,aa*4.0,cos(atan(pos.x,pos.z)*6.0)) ), albedo, smoothstep( .2-aa*1.5, .2, abs(pos.y) ) );
-	albedo = mix( vec3(.04), albedo, smoothstep( .05-aa*1.0, .05, abs(abs(pos.y)-.6) ) );
-	albedo = mix( vec3(1,.8,.08), albedo, smoothstep( .05-aa*1.0, .05, abs(abs(pos.y)-.65) ) );
-	
-	vec3 col = albedo*light;
-	
-	// specular
-	vec3 h = normalize(lightDir-ray);
-	float s = pow(max(0.0,dot(norm,h)),100.0)*100.0/32.0;
-	
-	vec3 specular = s*vec3(1,1,1);
-
-	vec3 rr = reflect(ray,norm);
-	specular += mix( vec3(0,.04,.04), Sky(rr), smoothstep( -.1, .1, rr.y ) );
-	
-	float ndotr = dot(norm,ray);
-	float fresnel = pow(1.0-abs(ndotr),5.0);
-	fresnel = mix( .001, 1.0, fresnel );
-
-	col = mix( col, specular, fresnel );
+	intersection = ro+rd*dist;
 	
 	return col;
 }
 
 
-float OceanDistanceField( vec3 pos )
-{
-	return pos.y - Waves(pos);
-}
-
-float OceanDistanceFieldDetail( vec3 pos )
-{
-	return pos.y - WavesDetail(pos);
-}
-
-vec3 OceanNormal( vec3 pos )
-{
-	vec3 norm;
-	vec2 d = vec2(.01*length(pos),0);
+vec3 trace(const vec3 ro, const vec3 rd, out vec3 intersection, out vec3 normal, out float dist, out int material) {
+	dist = MAXDISTANCE;
+	float distcheck;
 	
-	norm.x = OceanDistanceFieldDetail( pos+d.xyy )-OceanDistanceFieldDetail( pos-d.xyy );
-	norm.y = OceanDistanceFieldDetail( pos+d.yxy )-OceanDistanceFieldDetail( pos-d.yxy );
-	norm.z = OceanDistanceFieldDetail( pos+d.yyx )-OceanDistanceFieldDetail( pos-d.yyx );
-
-	return normalize(norm);
-}
-
-float TraceOcean( vec3 pos, vec3 ray )
-{
-	float h = 1.0;
-	float t = 0.0;
-	for ( int i=0; i < 100; i++ )
-	{
-		if ( h < .01 || t > 100.0 )
-			break;
-		h = OceanDistanceField( pos+t*ray );
-		t += h;
+	vec3 sphereCenter, col, normalcheck;
+	
+	material = 0;
+	col = getBackgroundColor(ro, rd);
+	
+	if( (distcheck = intersectPlane( ro,  rd, 0.)) < MAXDISTANCE ) {
+		dist = distcheck;
+		material = 1;
+		normal = vec3( 0., 1., 0. );
+		col = vec3( 0.5 );
+	} 
+	
+	// trace grid
+	vec3 pos = floor(ro/GRIDSIZE)*GRIDSIZE;
+	vec3 ri = 1.0/rd;
+	vec3 rs = sign(rd) * GRIDSIZE;
+	vec3 dis = (pos-ro + 0.5  * GRIDSIZE + rs*0.5) * ri;
+	vec3 mm = vec3(0.0);
+	vec2 offset;
+		
+	for( int i=0; i<RAYCASTSTEPS; i++ )	{
+		if( material == 2 ||  distance( ro.xz, pos.xz ) > dist+GRIDSIZE ) break; {
+			getSphereOffset( pos.xz, offset );
+			
+			getMovingSpherePosition( pos.xz, -offset, sphereCenter );			
+			if( (distcheck = intersectUnitSphere( ro, rd, sphereCenter )) < dist ) {
+				dist = distcheck;
+				normal = normalize((ro+rd*dist)-sphereCenter);
+				col = getSphereColor(pos.xz);
+				material = 2;
+			}
+			
+			getSpherePosition( pos.xz, offset, sphereCenter );
+			if( (distcheck = intersectUnitSphere( ro, rd, sphereCenter )) < dist ) {
+				dist = distcheck;
+				normal = normalize((ro+rd*dist)-sphereCenter);
+				col = getSphereColor(pos.xz+vec2(1.,2.));
+				material = 2;
+			}		
+			mm = step(dis.xyz, dis.zyx);
+			dis += mm * rs * ri;
+			pos += mm * rs;		
+		}
 	}
 	
-	if ( h > .1 )
-		return 0.0;
-	
-	return t;
-}
-
-
-vec3 ShadeOcean( vec3 pos, vec3 ray )
-{
-	vec3 norm = OceanNormal(pos);
-	float ndotr = dot(ray,norm);
-
-	float fresnel = pow(1.0-abs(ndotr),5.0);
-	
-	vec3 reflectedRay = ray-2.0*norm*ndotr;
-	vec3 refractedRay = ray+(-cos(1.33*acos(-ndotr))-ndotr)*norm;	
-	refractedRay = normalize(refractedRay);
-
-	const float crackFudge = .0;
-	
-	// reflection
-	vec3 reflection = Sky(reflectedRay);
-	float t=TraceBoat( pos-crackFudge*reflectedRay, reflectedRay );
-	
-	if ( t > 0.0 )
-	{
-		reflection = ShadeBoat( pos+(t-crackFudge)*reflectedRay, reflectedRay );
-	}
-
-	
-	// refraction
-	t=TraceBoat( pos-crackFudge*refractedRay, refractedRay );
-	
-	vec3 col = vec3(0,.04,.04); // under-sea colour
-	if ( t > 0.0 )
-	{
-		col = mix( col, ShadeBoat( pos+(t-crackFudge)*refractedRay, refractedRay ), exp(-t) );
-	}
-	
-	col = mix( col, reflection, fresnel );
-	
-	// foam
-	col = mix( col, vec3(1), WaveCrests(pos) );
+	intersection = ro+rd*dist;
 	
 	return col;
 }
 
+vec2 rv2;
 
-void main(void)
-{
-	ComputeBoatTransform();
+vec3 cosWeightedRandomHemisphereDirection2( const vec3 n ) {
+	vec3  uu = normalize( cross( n, vec3(0.0,1.0,1.0) ) );
+	vec3  vv = normalize( cross( uu, n ) );
 	
-	vec2 camRot = vec2(.5,.5)+vec2(-.35,4.5)*(iMouse.yx/iResolution.yx);
-	vec3 pos, ray;
-	CamPolar( pos, ray, vec3(0), camRot, 3.0, 1.0 );
+	float ra = sqrt(rv2.y);
+	float rx = ra*cos(6.2831*rv2.x); 
+	float ry = ra*sin(6.2831*rv2.x);
+	float rz = sqrt( 1.0-rv2.y );
+	vec3  rr = vec3( rx*uu + ry*vv + rz*n );
+
+    return normalize( rr );
+}
+
+
+void main(void) {
+	vec2 q = gl_FragCoord.xy/iResolution.xy;
+	vec2 p = -1.0+2.0*q;
+	p.x *= iResolution.x/iResolution.y;
 	
-	float to = TraceOcean( pos, ray );
-	float tb = TraceBoat( pos, ray );
+	vec3 col = vec3( 0. );
 	
-	vec3 result;
-	if ( to > 0.0 && ( to < tb || tb == 0.0 ) )
-		result = ShadeOcean( pos+ray*to, ray );
-	else if ( tb > 0.0 )
-		result = ShadeBoat( pos+ray*tb, ray );
-	else
-		result = Sky( ray );
+	// raytrace
+	int material;
+	vec3 normal, intersection;
+	float dist;
+	float seed = time+(p.x+iResolution.x*p.y)*1.51269341231;
 	
-	// vignette effect
-	result *= 1.1*smoothstep( .35, 1.0, localRay.z );
+	for( int j=0; j<SAMPLES; j++ ) {
+		float fj = float(j);
+		
+#ifdef MOTIONBLUR
+		time = iGlobalTime + fj/(float(SAMPLES)*TARGETFPS);
+#endif
+		
+		rv2 = hash2( 24.4316544311*fj+time+seed );
+		
+		vec2 pt = p+rv2/(0.5*iResolution.xy);
+				
+		// camera	
+		vec3 ro = vec3( cos( 0.232*time) * 10., 6.+3.*cos(0.3*time), GRIDSIZE*(time/SPEED) );
+		vec3 ta = ro + vec3( -sin( 0.232*time) * 10., -2.0+cos(0.23*time), 10.0 );
+		
+		float roll = -0.15*sin(0.5*time);
+		
+		// camera tx
+		vec3 cw = normalize( ta-ro );
+		vec3 cp = vec3( sin(roll), cos(roll),0.0 );
+		vec3 cu = normalize( cross(cw,cp) );
+		vec3 cv = normalize( cross(cu,cw) );
 	
-	gl_FragColor = vec4(ToGamma(result),1.0);
+#ifdef DEPTHOFFIELD
+    // create ray with depth of field
+		const float fov = 3.0;
+		
+        vec3 er = normalize( vec3( pt.xy, fov ) );
+        vec3 rd = er.x*cu + er.y*cv + er.z*cw;
+
+        vec3 go = FOCUSBLUR*vec3( (rv2-vec2(0.5))*2., 0.0 );
+        vec3 gd = normalize( er*FOCUSDISTANCE - go );
+		
+        ro += go.x*cu + go.y*cv;
+        rd += gd.x*cu + gd.y*cv;
+		rd = normalize(rd);
+#else
+		vec3 rd = normalize( pt.x*cu + pt.y*cv + 1.5*cw );		
+#endif			
+		vec3 colsample = vec3( 1. );
+		
+		// first hit
+		rv2 = hash2( (rv2.x*2.4543263+rv2.y)*(time+1.) );
+		colsample *= trace(ro, rd, intersection, normal, dist, material);
+
+		// bounces
+		for( int i=0; i<(PATHDEPTH-1); i++ ) {
+			if( material != 0 ) {
+				rd = cosWeightedRandomHemisphereDirection2( normal );
+				ro = intersection + EPSILON*rd;
+						
+				rv2 = hash2( (rv2.x*2.4543263+rv2.y)*(time+1.)+(float(i+1)*.23) );
+						
+				colsample *= traceRec(ro, rd, intersection, normal, dist, material);
+			}
+		}	
+		if( material == 0 ) {			
+			col += colsample;	
+		}
+	}
+	col  /= float(SAMPLES);
+	
+	col = pow( col, vec3(0.7) );	
+	col = clamp(col, 0.0, 1.0);
+	// contrast	
+ //   col = clamp( col*0.7 + 0.3*col*col*(3.0-2.0*col), 0., 1.); 
+	   
+	// vigneting
+	col *= 0.25+0.75*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.15 );
+	
+	gl_FragColor = vec4( col,1.0);
 }

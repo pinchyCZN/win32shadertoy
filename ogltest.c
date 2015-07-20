@@ -225,6 +225,7 @@ int get_time(float *time)
 		*time=(float)delta/(float)1000;
 	return delta/1000;
 }
+
 int set_vars(GLuint p)
 {
 	GLint loc;

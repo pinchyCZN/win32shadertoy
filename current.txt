@@ -9,255 +9,347 @@ uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)
 uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
 uniform vec4      iDate;                 // (year, month, day, time in seconds)
 
-const float kCharBlank = 12.0;
-const float kCharMinus = 11.0;
-const float kCharDecimalPoint = 10.0;
+// Created by inigo quilez - iq/2013
+// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 
-float InRect(const in vec2 vUV, const in vec4 vRect)
+// A list of usefull distance function to simple primitives, and an example on how to 
+// do some interesting boolean operations, repetition and displacement.
+//
+// More info here: http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+
+float sdPlane( vec3 p )
 {
-	vec2 vTestMin = step(vRect.xy, vUV.xy);
-	vec2 vTestMax = step(vUV.xy, vRect.zw);	
-	vec2 vTest = vTestMin * vTestMax;
-	return vTest.x * vTest.y;
+	return p.y;
 }
 
-float SampleDigit(const in float fDigit, const in vec2 vUV)
+float sdSphere( vec3 p, float s )
 {
-	const float x0 = 0.0 / 4.0;
-	const float x1 = 1.0 / 4.0;
-	const float x2 = 2.0 / 4.0;
-	const float x3 = 3.0 / 4.0;
-	const float x4 = 4.0 / 4.0;
-	
-	const float y0 = 0.0 / 5.0;
-	const float y1 = 1.0 / 5.0;
-	const float y2 = 2.0 / 5.0;
-	const float y3 = 3.0 / 5.0;
-	const float y4 = 4.0 / 5.0;
-	const float y5 = 5.0 / 5.0;
-
-	// In this version each digit is made of up to 3 rectangles which we XOR together to get the result
-	
-	vec4 vRect0 = vec4(0.0);
-	vec4 vRect1 = vec4(0.0);
-	vec4 vRect2 = vec4(0.0);
-		
-	if(fDigit < 0.5) // 0
-	{
-		vRect0 = vec4(x0, y0, x3, y5); vRect1 = vec4(x1, y1, x2, y4);
-	}
-	else if(fDigit < 1.5) // 1
-	{
-		vRect0 = vec4(x1, y0, x2, y5); vRect1 = vec4(x0, y0, x0, y0);
-	}
-	else if(fDigit < 2.5) // 2
-	{
-		vRect0 = vec4(x0, y0, x3, y5); vRect1 = vec4(x0, y3, x2, y4); vRect2 = vec4(x1, y1, x3, y2);
-	}
-	else if(fDigit < 3.5) // 3
-	{
-		vRect0 = vec4(x0, y0, x3, y5); vRect1 = vec4(x0, y3, x2, y4); vRect2 = vec4(x0, y1, x2, y2);
-	}
-	else if(fDigit < 4.5) // 4
-	{
-		vRect0 = vec4(x0, y1, x2, y5); vRect1 = vec4(x1, y2, x2, y5); vRect2 = vec4(x2, y0, x3, y3);
-	}
-	else if(fDigit < 5.5) // 5
-	{
-		vRect0 = vec4(x0, y0, x3, y5); vRect1 = vec4(x1, y3, x3, y4); vRect2 = vec4(x0, y1, x2, y2);
-	}
-	else if(fDigit < 6.5) // 6
-	{
-		vRect0 = vec4(x0, y0, x3, y5); vRect1 = vec4(x1, y3, x3, y4); vRect2 = vec4(x1, y1, x2, y2);
-	}
-	else if(fDigit < 7.5) // 7
-	{
-		vRect0 = vec4(x0, y0, x3, y5); vRect1 = vec4(x0, y0, x2, y4);
-	}
-	else if(fDigit < 8.5) // 8
-	{
-		vRect0 = vec4(x0, y0, x3, y5); vRect1 = vec4(x1, y1, x2, y2); vRect2 = vec4(x1, y3, x2, y4);
-	}
-	else if(fDigit < 9.5) // 9
-	{
-		vRect0 = vec4(x0, y0, x3, y5); vRect1 = vec4(x1, y3, x2, y4); vRect2 = vec4(x0, y1, x2, y2);
-	}
-	else if(fDigit < 10.5) // '.'
-	{
-		vRect0 = vec4(x1, y0, x2, y1);
-	}
-	else if(fDigit < 11.5) // '-'
-	{
-		vRect0 = vec4(x0, y2, x3, y3);
-	}	
-	
-	float fResult = InRect(vUV, vRect0) + InRect(vUV, vRect1) + InRect(vUV, vRect2);
-	
-	return mod(fResult, 2.0);
-}
-float PrintValue(const in vec2 vStringCharCoords, const in float fValue, const in float fMaxDigits, const in float fDecimalPlaces)
-{
-	float fAbsValue = abs(fValue);
-	
-	float fStringCharIndex = floor(vStringCharCoords.x);
-	
-	float fLog10Value = log2(fAbsValue) / log2(10.0);
-	float fBiggestDigitIndex = max(floor(fLog10Value), 0.0);
-	
-	// This is the character we are going to display for this pixel
-	float fDigitCharacter = kCharBlank;
-	
-	float fDigitIndex = fMaxDigits - fStringCharIndex;
-	if(fDigitIndex > (-fDecimalPlaces - 1.5))
-	{
-		if(fDigitIndex > fBiggestDigitIndex)
-		{
-			if(fValue < 0.0)
-			{
-				if(fDigitIndex < (fBiggestDigitIndex+1.5))
-				{
-					fDigitCharacter = kCharMinus;
-				}
-			}
-		}
-		else
-		{		
-			if(fDigitIndex == -1.0)
-			{
-				if(fDecimalPlaces > 0.0)
-				{
-					fDigitCharacter = kCharDecimalPoint;
-				}
-			}
-			else
-			{
-				if(fDigitIndex < 0.0)
-				{
-					// move along one to account for .
-					fDigitIndex += 1.0;
-				}
-
-				float fDigitValue = (fAbsValue / (pow(10.0, fDigitIndex)));
-
-				// This is inaccurate - I think because I treat each digit independently
-				// The value 2.0 gets printed as 2.09 :/
-				//fDigitCharacter = mod(floor(fDigitValue), 10.0);
-				fDigitCharacter = mod(floor(0.001+fDigitValue), 10.0); // fix from iq
-			}		
-		}
-	}
-
-	vec2 vCharPos = vec2(fract(vStringCharCoords.x), vStringCharCoords.y);
-
-	return SampleDigit(fDigitCharacter, vCharPos);	
+    return length(p)-s;
 }
 
-float PrintValue(const in vec2 vPixelCoords, const in vec2 vFontSize, const in float fValue, const in float fMaxDigits, const in float fDecimalPlaces)
+float sdBox( vec3 p, vec3 b )
 {
-	return PrintValue((gl_FragCoord.xy - vPixelCoords) / vFontSize, fValue, fMaxDigits, fDecimalPlaces);
-}
-float sphere(vec3 ray, vec3 dir, vec3 center, float radius)
-{
-	vec3 rc = ray-center;
-	float c = dot(rc, rc) - (radius*radius);
-	float b = dot(dir, rc);
-	float d = b*b - c;
-	float t = b + sqrt(abs(d));
-	float st = step(0.0, min(t,d));
-	return mix(-1.0, t, st);
+  vec3 d = abs(p) - b;
+  return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
 }
 
-float calc(vec3 ro,vec3 dir,vec3 center,float radius)
+float udRoundBox( vec3 p, vec3 b, float r )
 {
-//length(max(abs(p)-b,0.0));
-	float result=0;
-	vec3 r2=ro+dir;
-	float a=dot(r2,center);
-	float b=dot(r2,r2)-1;
-	float c=a*a-b;
-
-	if(c>0)
-		result=1;
-	else
-		result=0;
-	return result;
+  return length(max(abs(p)-b,0.0))-r;
 }
 
-float sdSphere(vec3 p, vec3 c,float r)
+float sdTorus( vec3 p, vec2 t )
 {
-	return abs(length(p-c))-r;
+  return length( vec2(length(p.xz)-t.x,p.y) )-t.y;
 }
-float sdBox(vec3 p, vec3 b)
-{	
-	float f;
-	vec3 c=cross(p,b);
-	vec3 d = abs(p) - abs(c);
-	f=min(max(d.x,max(d.y,d.z)),0.0);
-	f += length(max(d,0));
-	return f;
-}
-float sdTorus(vec3 p, vec2 t)
-{
-  vec2 q = vec2(length(p.xy)-t.x,p.z);
-  return length(q)-t.y;
-}
-void main(void)
-{
-	vec2 vFontSize = vec2(8.0, 15.0);
-	vec2 uv = gl_FragCoord.xy - (iResolution.xy/2);
-	vec3 ro = vec3(0,0, -30+iMouse.x/10);
-	vec3 rd = vec3(uv, 0);
-	vec3 center = vec3(1.0, 1.90, 1.0);
-	vec3 dir=vec3(0,0,0);
-	vec3 col =  vec3(0., .5, 0);
-	float i;
-	float dist=0;
-	float t=0;
-	vec3 ray=rd;	
-	for(i=0;i<1000;i+=10){
-		//dist=sdBox(ro-vec3(10,10,10),vec3(10,10,10));
 
-		vec3 obj=vec3(0,0,100);
-		vec3 light=vec3(10,10,-10);
+float sdHexPrism( vec3 p, vec2 h )
+{
+    vec3 q = abs(p);
+#if 0
+    return max(q.z-h.y,max((q.x*0.866025+q.y*0.5),q.y)-h.x);
+#else
+    float d1 = q.z-h.y;
+    float d2 = max((q.x*0.866025+q.y*0.5),q.y)-h.x;
+    return length(max(vec2(d1,d2),0.0)) + min(max(d1,d2), 0.);
+#endif
+}
 
-		dist=sdSphere(ray-ro,obj-ro,60);
-		float d;
-		d=sqrt(dist);
-		if(d>0 && d<.1){
-			obj=sin(length(cross(ro,light))/900);
-			
-			t=length(obj);
-			t=1;
-			break;
-				
-		}
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+	vec3 pa = p-a, ba = b-a;
+	float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+	return length( pa - ba*h ) - r;
+}
+
+float sdTriPrism( vec3 p, vec2 h )
+{
+    vec3 q = abs(p);
+#if 0
+    return max(q.z-h.y,max(q.x*0.866025+p.y*0.5,-p.y)-h.x*0.5);
+#else
+    float d1 = q.z-h.y;
+    float d2 = max(q.x*0.866025+p.y*0.5,-p.y)-h.x*0.5;
+    return length(max(vec2(d1,d2),0.0)) + min(max(d1,d2), 0.);
+#endif
+}
+
+float sdCylinder( vec3 p, vec2 h )
+{
+  vec2 d = abs(vec2(length(p.xz),p.y)) - h;
+  return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+
+
+float sdCone( in vec3 p, in vec3 c )
+{
+    vec2 q = vec2( length(p.xz), p.y );
+#if 0
+	return max( max( dot(q,c.xy), p.y), -p.y-c.z );
+#else
+    float d1 = -p.y-c.z;
+    float d2 = max( dot(q,c.xy), p.y);
+    return length(max(vec2(d1,d2),0.0)) + min(max(d1,d2), 0.);
+#endif    
+}
+
+float length2( vec2 p )
+{
+	return sqrt( p.x*p.x + p.y*p.y );
+}
+
+float length6( vec2 p )
+{
+	p = p*p*p; p = p*p;
+	return pow( p.x + p.y, 1.0/6.0 );
+}
+
+float length8( vec2 p )
+{
+	p = p*p; p = p*p; p = p*p;
+	return pow( p.x + p.y, 1.0/8.0 );
+}
+
+float sdTorus82( vec3 p, vec2 t )
+{
+  vec2 q = vec2(length2(p.xz)-t.x,p.y);
+  return length8(q)-t.y;
+}
+
+float sdTorus88( vec3 p, vec2 t )
+{
+  vec2 q = vec2(length8(p.xz)-t.x,p.y);
+  return length8(q)-t.y;
+}
+
+float sdCylinder6( vec3 p, vec2 h )
+{
+  return max( length6(p.xz)-h.x, abs(p.y)-h.y );
+}
+
+//----------------------------------------------------------------------
+
+float opS( float d1, float d2 )
+{
+    return max(-d2,d1);
+}
+
+vec2 opU( vec2 d1, vec2 d2 )
+{
+	return (d1.x<d2.x) ? d1 : d2;
+}
+
+vec3 opRep( vec3 p, vec3 c )
+{
+    return mod(p,c)-0.5*c;
+}
+
+vec3 opTwist( vec3 p )
+{
+    float  c = cos(10.0*p.y+10.0);
+    float  s = sin(10.0*p.y+10.0);
+    mat2   m = mat2(c,-s,s,c);
+    return vec3(m*p.xz,p.y);
+}
+
+//----------------------------------------------------------------------
+
+vec2 map( in vec3 pos )
+{
+    vec2 res = opU( vec2( sdPlane(     pos), 1.0 ),1);
+//	                vec2( sdSphere(    pos-vec3( 0.0,0.25, 0.0), 0.25 ), 46.9 ) );
+
+//    res = opU( res, vec2( sdBox(       pos-vec3( 1.0,0.25, 0.0), vec3(0.25) ), 1.0 ) );
+
+    res = opS( vec2( sdBox(pos, vec3(1,1,1) ), 1.0  ) ,1);
+
+
 
 /*
-		dist=sdTorus(ro,vec2(50,17));
-		if(dist>=0 && dist<.1){
-			t=1;
-			break;
-				
-		}
+    res = opU( res, vec2( udRoundBox(  pos-vec3( 1.0,0.25, 1.0), vec3(0.15), 0.1 ), 41.0 ) );
+	res = opU( res, vec2( sdTorus(     pos-vec3( 0.0,0.25, 1.0), vec2(0.20,0.05) ), 25.0 ) );
+    res = opU( res, vec2( sdCapsule(   pos,vec3(-1.3,0.20,-0.1), vec3(-1.0,0.20,0.2), 0.1  ), 31.9 ) );
+	res = opU( res, vec2( sdTriPrism(  pos-vec3(-1.0,0.25,-1.0), vec2(0.25,0.05) ),43.5 ) );
+	res = opU( res, vec2( sdCylinder(  pos-vec3( 1.0,0.30,-1.0), vec2(0.1,0.2) ), 8.0 ) );
+	res = opU( res, vec2( sdCone(      pos-vec3( 0.0,0.50,-1.0), vec3(0.8,0.6,0.3) ), 55.0 ) );
+	res = opU( res, vec2( sdTorus82(   pos-vec3( 0.0,0.25, 2.0), vec2(0.20,0.05) ),50.0 ) );
+	res = opU( res, vec2( sdTorus88(   pos-vec3(-1.0,0.25, 2.0), vec2(0.20,0.05) ),43.0 ) );
+	res = opU( res, vec2( sdCylinder6( pos-vec3( 1.0,0.30, 2.0), vec2(0.1,0.2) ), 12.0 ) );
+	res = opU( res, vec2( sdHexPrism(  pos-vec3(-1.0,0.20, 1.0), vec2(0.25,0.05) ),17.0 ) );
+    res = opU( res, vec2( opS(
+		             udRoundBox(  pos-vec3(-2.0,0.2, 1.0), vec3(0.15),0.05),
+	                 sdSphere(    pos-vec3(-2.0,0.2, 1.0), 0.25)), 13.0 ) );
+    res = opU( res, vec2( opS(
+		             sdTorus82(  pos-vec3(-2.0,0.2, 0.0), vec2(0.20,0.1)),
+	                 sdCylinder(  opRep( vec3(atan(pos.x+2.0,pos.z)/6.2831,
+											  pos.y,
+											  0.02+0.5*length(pos-vec3(-2.0,0.2, 0.0))),
+									     vec3(0.05,1.0,0.05)), vec2(0.02,0.6))), 51.0 ) );
+	res = opU( res, vec2( 0.7*sdSphere(    pos-vec3(-2.0,0.25,-1.0), 0.2 ) + 
+					                   0.03*sin(50.0*pos.x)*sin(50.0*pos.y)*sin(50.0*pos.z), 
+                                       65.0 ) );
+	res = opU( res, vec2( 0.5*sdTorus( opTwist(pos-vec3(-2.0,0.25, 2.0)),vec2(0.20,0.05)), 46.7 ) );
 */
 
-/*
-		dist=sdBox(ro,vec3(11,11.0,100.0));
-		if(dist>=0 && dist<2.01){
-			t=dist;
-			break;
-				
-		}
-*/
-		ray=ray+dist;
+    return res;
+}
 
+vec2 castRay( in vec3 ro, in vec3 rd )
+{
+    float tmin = 1.0;
+    float tmax = 20.0;
+    
+#if 0
+    float tp1 = (0.0-ro.y)/rd.y; if( tp1>0.0 ) tmax = min( tmax, tp1 );
+    float tp2 = (1.6-ro.y)/rd.y; if( tp2>0.0 ) { if( ro.y>1.6 ) tmin = max( tmin, tp2 );
+                                                 else           tmax = min( tmax, tp2 ); }
+#endif
+    
+	float precis = 0.002;
+    float t = tmin;
+    float m = -1.0;
+    for( int i=0; i<50; i++ )
+    {
+	    vec2 res = map( ro+rd*t );
+        if( res.x<precis || t>tmax ) break;
+        t += res.x;
+	    m = res.y;
+    }
+
+    if( t>tmax ) m=-1.0;
+    return vec2( t, m );
+}
+
+
+float softshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
+{
+	float res = 1.0;
+    float t = mint;
+    for( int i=0; i<16; i++ )
+    {
+		float h = map( ro + rd*t ).x;
+        res = min( res, 8.0*h/t );
+        t += clamp( h, 0.02, 0.10 );
+        if( h<0.001 || t>tmax ) break;
+    }
+    return clamp( res, 0.0, 1.0 );
+
+}
+
+vec3 calcNormal( in vec3 pos )
+{
+	vec3 eps = vec3( 0.001, 0.0, 0.0 );
+	vec3 nor = vec3(
+	    map(pos+eps.xyy).x - map(pos-eps.xyy).x,
+	    map(pos+eps.yxy).x - map(pos-eps.yxy).x,
+	    map(pos+eps.yyx).x - map(pos-eps.yyx).x );
+	return normalize(nor);
+}
+
+float calcAO( in vec3 pos, in vec3 nor )
+{
+	float occ = 0.0;
+    float sca = 1.0;
+    for( int i=0; i<5; i++ )
+    {
+        float hr = 0.01 + 0.12*float(i)/4.0;
+        vec3 aopos =  nor * hr + pos;
+        float dd = map( aopos ).x;
+        occ += -(dd-hr)*sca;
+        sca *= 0.95;
+    }
+    return clamp( 1.0 - 3.0*occ, 0.0, 1.0 );    
+}
+
+
+
+
+vec3 render( in vec3 ro, in vec3 rd )
+{ 
+    vec3 col = vec3(0.8, 0.9, 1.0);
+    vec2 res = castRay(ro,rd);
+    float t = res.x;
+	float m = res.y;
+    if( m>-0.5 )
+    {
+        vec3 pos = ro + t*rd;
+        vec3 nor = calcNormal( pos );
+        vec3 ref = reflect( rd, nor );
+        
+        // material        
+		col = 0.45 + 0.3*sin( vec3(0.05,0.08,0.10)*(m-1.0) );
 		
-	}
-	vec3 test=vec3(1,2,3);
-	test+=4; //(4,1,7);
-	float val = PrintValue(vec2(10,10), vFontSize ,iMouse.x, 4.0, 2.0);
+        if( m<1.5 )
+        {
+            
+            float f = mod( floor(5.0*pos.z) + floor(5.0*pos.x), 2.0);
+            col = 0.4 + 0.1*f*vec3(1.0);
+        }
 
-	col=mix(0, col, t);
-	col+=vec3(val*9,0,0);
-	gl_FragColor = vec4(col , 1.0 );
+        // lighitng        
+        float occ = calcAO( pos, nor );
+		vec3  lig = normalize( vec3(-0.6, 0.7, -0.5) );
+		float amb = clamp( 0.5+0.5*nor.y, 0.0, 1.0 );
+        float dif = clamp( dot( nor, lig ), 0.0, 1.0 );
+        float bac = clamp( dot( nor, normalize(vec3(-lig.x,0.0,-lig.z))), 0.0, 1.0 )*clamp( 1.0-pos.y,0.0,1.0);
+        float dom = smoothstep( -0.1, 0.1, ref.y );
+        float fre = pow( clamp(1.0+dot(nor,rd),0.0,1.0), 2.0 );
+		float spe = pow(clamp( dot( ref, lig ), 0.0, 1.0 ),16.0);
+        
+        dif *= softshadow( pos, lig, 0.02, 2.5 );
+        dom *= softshadow( pos, ref, 0.02, 2.5 );
+
+		vec3 brdf = vec3(0.0);
+        brdf += 1.20*dif*vec3(1.00,0.90,0.60);
+		brdf += 1.20*spe*vec3(1.00,0.90,0.60)*dif;
+        brdf += 0.30*amb*vec3(0.50,0.70,1.00)*occ;
+        brdf += 0.40*dom*vec3(0.50,0.70,1.00)*occ;
+        brdf += 0.30*bac*vec3(0.25,0.25,0.25)*occ;
+        brdf += 0.40*fre*vec3(1.00,1.00,1.00)*occ;
+		brdf += 0.02;
+		col = col*brdf;
+
+    	col = mix( col, vec3(0.8,0.9,1.0), 1.0-exp( -0.0005*t*t ) );
+
+    }
+
+	return vec3( clamp(col,0.0,1.0) );
+}
+
+mat3 setCamera( in vec3 ro, in vec3 ta, float cr )
+{
+	vec3 cw = normalize(ta-ro);
+	vec3 cp = vec3(sin(cr), cos(cr),0.0);
+	vec3 cu = normalize( cross(cw,cp) );
+	vec3 cv = normalize( cross(cu,cw) );
+    return mat3( cu, cv, cw );
+}
+
+void main()
+{
+	vec4 fragCoord=gl_FragCoord;
+
+	vec2 q = fragCoord.xy/iResolution.xy;
+    vec2 p = -1.0+2.0*q;
+	p.x *= iResolution.x/iResolution.y;
+    vec2 mo = iMouse.xy/iResolution.xy;
+		 
+	float time = 15.0 + iGlobalTime;
+
+	// camera	
+	vec3 ro = vec3( -0.5+3.2*cos(0.1*time + 6.0*mo.x), 1.0 + 2.0*mo.y, 0.5 + 3.2*sin(0.1*time + 6.0*mo.x) );
+	vec3 ta = vec3( -0.5, -0.4, 0.5 );
+	
+	// camera-to-world transformation
+    mat3 ca = setCamera( ro, ta, 0.0 );
+    
+    // ray direction
+	vec3 rd = ca * normalize( vec3(p.xy,1.2) );
+
+    // render	
+    vec3 col = render( ro, rd );
+
+	col = pow( col, vec3(0.4545) );
+
+    gl_FragColor=vec4( col, 1.0 );
 }
