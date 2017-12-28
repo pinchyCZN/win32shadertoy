@@ -663,7 +663,10 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			break;
 
 		case IDCANCEL:
+			EndDialog(hwnd,0);
+			break;
 		case IDOK:
+			write_ini_value("EDITOR","LOAD_PREAMBLE",load_preamble);
 			EndDialog(hwnd,0);
 			break;
 		}

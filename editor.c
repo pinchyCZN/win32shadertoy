@@ -366,6 +366,20 @@ LRESULT APIENTRY subclass_edit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			if(GetKeyState(VK_CONTROL)&0x8000)
 				SendMessage(hwnd,EM_SETSEL,0,-1);
 			break;
+		case 'R':
+			if(GetKeyState(VK_CONTROL)&0x8000)
+				load_current(hwnd);
+			break;
+		case 'S':
+			if(GetKeyState(VK_CONTROL)&0x8000){
+				HWND hstatus,hparent;
+				hstatus=0;
+				hparent=GetParent(hwnd);
+				if(hparent)
+					hstatus=GetDlgItem(hparent,IDC_STATUS);
+				save_text(hwnd,hstatus);
+			}
+			break;
 		}
 		break;
 	}
@@ -505,7 +519,7 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		}
 		break;
 	case WM_HELP:
-		//MessageBox(
+		//MessageBox(hwnd,
 		break;
 	case WM_CLOSE:
 		save_window_pos(hwnd,"EDITOR");

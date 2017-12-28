@@ -49,7 +49,8 @@ int load_preamble=TRUE;
 int src_sample=0;
 char start_dir[MAX_PATH]={0};
 
-char *preamble= "uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
+char *preamble=
+"uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
 "uniform float     iGlobalTime;           // shader playback time (in seconds)\r\n"
 "uniform sampler2D iChannel0;          // input channel. XX = 2D/Cube\r\n"
 "uniform sampler2D iChannel1;          // input channel. XX = 2D/Cube\r\n"
@@ -226,109 +227,112 @@ int get_time(float *time)
 	return delta/1000;
 }
 
+int set_uniform_float(GLuint p,int type,char *name,float *flist,int count)
+{
+	int result=FALSE;
+	GLint loc;
+	loc=glGetUniformLocation(p,name);
+	if(loc!=-1){
+		switch(type){
+		case 1:
+			glProgramUniform1fv(p,loc,count,flist);
+			break;
+		case 2:
+			glProgramUniform2fv(p,loc,count,flist);
+			break;
+		case 3:
+			glProgramUniform3fv(p,loc,count,flist);
+			break;
+		case 4:
+			glProgramUniform4fv(p,loc,count,flist);
+			break;
+		}
+		if(GL_NO_ERROR!=glGetError())
+			printf("error setting %s\n",name);
+		else
+			result=TRUE;
+	}
+	return result;
+}
+int set_uniform_int(GLuint p,char *name,int val)
+{
+	int result=FALSE;
+	GLint loc;
+	return 0;
+	loc=glGetUniformLocation(p,name);
+	if(loc!=-1){
+		glProgramUniform1i(p,loc,val);
+		if(GL_NO_ERROR!=glGetError())
+			printf("error setting %s\n",name);
+		else
+			result=TRUE;
+	}
+	return result;
+}
+
 int set_vars(GLuint p)
 {
-	GLint loc;
-	float f[4],time;
-	get_time(&time);
+	float f[4*3],ftime;
 	if(p==0)
 		return 0;
-	loc=glGetUniformLocation(p,"iResolution");
-	if(loc!=-1){
-		int e;
-		f[0]=screenw;
-		f[1]=screenh;
-		f[2]=0;
-		glProgramUniform3fv(p,loc,1,f);
-		e=glGetError();
-		if(GL_NO_ERROR!=e)
-			printf("error setting resolution of %i,%i error=0x%04X\n",screenw,screenh,e);
-	}
-	loc=glGetUniformLocation(p,"iGlobalTime");
-	if(loc!=-1){
-		glProgramUniform1f(p,loc,time);
-		if(GL_NO_ERROR!=glGetError())
-			printf("error setting time\n");
-	}
-	loc=glGetUniformLocation(p,"iChannelTime");
-	if(loc!=-1){
-		float flist[4];
-		int j;
-		for(j=0;j<4;j++){
-			flist[j]=time;
-		}
-		glProgramUniform1fv(p,loc,4,flist);
-		if(GL_NO_ERROR!=glGetError())
-			printf("error setting channel time\n");
-	}
+	get_time(&ftime);
+
+	f[0]=screenw;
+	f[1]=screenh;
+	f[2]=0;
+	set_uniform_float(p,3,"iResolution",f,1);
+	f[0]=ftime;
+	set_uniform_float(p,1,"iGlobalTime",f,1);
+	set_uniform_float(p,1,"iTime",f,1);
+
+	f[0]=f[1]=f[2]=f[3]=ftime;
+	set_uniform_float(p,1,"iChannelTime",f,4);
 	{
 		int j;
-		char str[40];
 		for(j=0;j<4;j++){
-			sprintf(str,"iChannelResolution[%i]",j);
-			loc=glGetUniformLocation(p,str);
-			if(loc!=-1){
-				float flist[3];
-				int x=64,y=64;
-				get_texture_res(j,&x,&y);
-				flist[0]=x;
-				flist[1]=y;
-				flist[2]=0;
-				glProgramUniform3fv(p,loc,1,flist);
-				if(GL_NO_ERROR!=glGetError())
-					printf("error setting chan rez %i\n",j);
-			}
+			int x=64,y=64;
+			int index;
+			get_texture_res(j,&x,&y);
+			index=j*3;
+			f[index+0]=x;
+			f[index+1]=y;
+			f[index+2]=0;
+		}
+		set_uniform_float(p,3,"iChannelResolution",f,4);
+		for(j=0;j<4;j++){
+			char str[40];
 			sprintf(str,"iChannel%i",j);
-			loc=glGetUniformLocation(p,str);
-			if(loc!=-1){
-				int tex=j;
-				glProgramUniform1i(p,loc,tex); //texture unit 0-4
-				if(GL_NO_ERROR!=glGetError())
-					printf("error setting channel texture %i\n",j);
-			}
+			set_uniform_int(p,str,j);
 		}
 	}
-	loc=glGetUniformLocation(p,"iMouse");
-	if(loc!=-1){
-		float flist[4];
+	if(lmb_down){
 		POINT pt;
-		if(lmb_down){
-			GetCursorPos(&pt);
-			MapWindowPoints(NULL,hview,&pt,1);
-			flist[0]=pt.x;
-			flist[1]=screenh-pt.y;
+		GetCursorPos(&pt);
+		MapWindowPoints(NULL,hview,&pt,1);
+		clickx=pt.x;
+		clicky=pt.y;
+		f[0]=pt.x;
+		f[1]=screenh-pt.y;
 
-			flist[2]=clickx;
-			flist[3]=screenh-clicky;
-			glProgramUniform4fv(p,loc,1,flist);
-			clickx=pt.x;
-			clicky=pt.y;
-			if(GL_NO_ERROR!=glGetError())
-				printf("error setting mouse lmb down\n");
-		}
-		else{
-			flist[0]=clickx;
-			flist[1]=screenh-clicky;
-			flist[2]=0;
-			flist[3]=0;
-			glProgramUniform4fv(p,loc,1,flist);
-			if(GL_NO_ERROR!=glGetError())
-				printf("error setting mouse\n");
-		}
-
+		f[2]=clickx;
+		f[3]=screenh-clicky;
+		set_uniform_float(p,4,"iMouse",f,1);
 	}
-	loc=glGetUniformLocation(p,"iDate");
-	if(loc!=-1){
-		float flist[4];
+	else{
+		f[0]=clickx;
+		f[1]=screenh-clicky;
+		f[2]=0;
+		f[3]=0;
+		set_uniform_float(p,4,"iMouse",f,1);
+	}
+	{
 		SYSTEMTIME time;
 		GetLocalTime(&time);
-		flist[0]=time.wYear;
-		flist[1]=time.wMonth;
-		flist[2]=time.wDay;
-		flist[3]=time.wSecond+time.wMinute*60+time.wHour*60*60;
-		glProgramUniform4fv(p,loc,1,flist);
-		if(GL_NO_ERROR!=glGetError())
-			printf("error setting date\n");
+		f[0]=time.wYear;
+		f[1]=time.wMonth;
+		f[2]=time.wDay;
+		f[3]=time.wSecond+time.wMinute*60+time.wHour*60*60;
+		set_uniform_float(p,4,"iDate",f,1);
 	}
 	return 0;
 }
@@ -531,6 +535,7 @@ int load_current_path(char *path,int len)
 		_snprintf(path,len,"%s\\%s",start_dir,"current.txt");
 		path[len-1]=0;
 	}
+	return 0;
 }
 int load_current(hedit)
 {
@@ -544,10 +549,14 @@ int load_current(hedit)
 			load_current_path(path,sizeof(path));
 			f=fopen(path,"rb");
 			if(f){
+				CHARRANGE cr;
+				cr.cpMax=-1;
+				cr.cpMin=-1;
 				memset(s,0,size);
 				fread(s,1,size-1,f);
 				fclose(f);
 				SetWindowText(hedit,s);
+				SendMessage(hedit,EM_EXSETSEL,0,&cr);
 			}
 			free(s);
 		}
@@ -582,6 +591,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			if(heditwin){
 				SetWindowPos(heditwin,HWND_TOP,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW|SWP_NOZORDER);
 				restore_window(heditwin,"EDITOR");
+				get_ini_value("EDITOR","LOAD_PREAMBLE",&load_preamble);
 				PostMessage(hwnd,WM_APP,1,0);
 			}
 			{
@@ -672,7 +682,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		break;
 	case WM_PAINT:
 		{
-			float f=0.1;
+			float f=0.1f;
 			if(pause){
 				;
 			}
