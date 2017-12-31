@@ -585,11 +585,11 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				wglMakeCurrent(hDC,hGLRC);
 				load_call_table();
 			}
-			heditwin=CreateDialog(ghinstance,MAKEINTRESOURCE(IDD_SHADER_EDIT),hwnd,WndEdit);
+			heditwin=CreateDialog(ghinstance,MAKEINTRESOURCE(IDD_SHADER_EDIT),0,WndEdit);
 			set_shaders(&program,TRUE);
 			load_textures();
 			if(heditwin){
-				SetWindowPos(heditwin,HWND_TOP,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW|SWP_NOZORDER);
+				SetWindowPos(heditwin,HWND_BOTTOM,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW);
 				restore_window(heditwin,"EDITOR");
 				get_ini_value("EDITOR","LOAD_PREAMBLE",&load_preamble);
 				PostMessage(hwnd,WM_APP,1,0);
@@ -597,7 +597,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			{
 			RECT rect;
 			//SetWindowPos(hwnd,HWND_TOP,0,0,sw/2,sh/2,0);
-			SetWindowPos(hwnd,HWND_TOP,0,0,sw/(2+4),sh/(2+4),SWP_NOZORDER);
+			SetWindowPos(hwnd,HWND_TOP,0,0,sw/(2+4),sh/(2+4),0);
 			restore_window(hwnd,"MAIN_WINDOW");
 
 			GetClientRect(hwnd,&rect);
@@ -675,6 +675,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		{
 			screenw=LOWORD(lparam);
 			screenh=HIWORD(lparam);
+			printf("screen res x=%i,y=%i\n",screenw,screenh);
 			reshape(screenw,screenh);
 			set_vars(program);
 		}

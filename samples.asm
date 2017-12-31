@@ -2,7 +2,7 @@
 
 SECTION .data
 
-%define total_samples 19
+%define total_samples 20
 
 %macro inc_sample 1
 
