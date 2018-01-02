@@ -366,7 +366,8 @@ int load_call_table()
 	}
 	return TRUE;
 }
-int set_shaders(int *program,int fromfile){
+int set_shaders(int *program,int fromfile)
+{
 	int result=FALSE;
 	static GLuint v=0,f=0,p=0;
 

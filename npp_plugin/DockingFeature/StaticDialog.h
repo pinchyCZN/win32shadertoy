@@ -24,6 +24,14 @@
 
 enum PosAlign{ALIGNPOS_LEFT, ALIGNPOS_RIGHT, ALIGNPOS_TOP, ALIGNPOS_BOTTOM};
 
+#ifndef WS_EX_LAYOUTRTL
+#define WS_EX_LAYOUTRTL 0x00400000L
+#endif
+#ifndef _WIN64
+	#define SetWindowLongPtr SetWindowLong
+	#define GetWindowLongPtr GetWindowLong
+#endif
+
 struct DLGTEMPLATEEX {
       WORD   dlgVer;
       WORD   signature;

@@ -82,12 +82,12 @@ int setupPixelFormat(HDC hDC)
 
     pixelFormat = ChoosePixelFormat(hDC, &pfd);
     if (pixelFormat == 0) {
-        MessageBox(WindowFromDC(hDC), L"ChoosePixelFormat failed.", L"Error",
+        MessageBox(WindowFromDC(hDC), TEXT("ChoosePixelFormat failed."), TEXT("Error"),
                 MB_ICONERROR | MB_OK);
     }
 
     if (SetPixelFormat(hDC, pixelFormat, &pfd) != TRUE) {
-        MessageBox(WindowFromDC(hDC), L"SetPixelFormat failed.", L"Error",
+        MessageBox(WindowFromDC(hDC), TEXT("SetPixelFormat failed."), TEXT("Error"),
                 MB_ICONERROR | MB_OK);
     }
 	return 0;
@@ -117,7 +117,7 @@ int load_call_table(HWND hwnd)
 	glGetUniformfv=(PFNGLGETUNIFORMFVPROC)wglGetProcAddress("glGetUniformfv");
 	glGetUniformiv=(PFNGLGETUNIFORMIVPROC)wglGetProcAddress("glGetUniformfv");
 	if(glCreateShader==0){
-		MessageBox(hwnd,L"Unable to load Open GL extensions",L"ERROR",MB_OK|MB_SYSTEMMODAL);
+		MessageBox(hwnd,TEXT("Unable to load Open GL extensions"),TEXT("ERROR"),MB_OK|MB_SYSTEMMODAL);
 		return FALSE;
 	}
 	return TRUE;
@@ -231,7 +231,7 @@ private :
 //
 // The data of Notepad++ that you can use in your plugin commands
 //
-NppData nppData;
+
 HINSTANCE hinstance;
 ShaderVIEW shader_view;
 SettingsDLG settings;
@@ -407,8 +407,8 @@ bool setCommand(size_t index, TCHAR *cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey 
 }
 void dialogsInit()
 {
-	settings.init(hinstance,nppData._nppHandle);
-	shader_view.init(hinstance,nppData._nppHandle);
+//	settings.init(hinstance,nppData._nppHandle);
+//	shader_view.init(hinstance,nppData._nppHandle);
 }
 
 //----------------------------------------------//
@@ -416,6 +416,7 @@ void dialogsInit()
 //----------------------------------------------//
 void show_dialogs(int show_settings)
 {
+	/*
 	tTbData	data = {0};
 	if(!shader_view.isCreated()){
 		shader_view.create(&data);
@@ -452,6 +453,7 @@ void show_dialogs(int show_settings)
 
 	//shader_view.toggleActiveTb();
 	//shader_view.
+	*/
 }
 
 void start_shadertoy()

@@ -1,4 +1,5 @@
-;nasmw -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc $(InputName).asm
+;nasmw -t -f  win32 -o$(IntDir)\$(InputName).obj -Xvc "$(InputPath)"
+;$(TargetDir)\$(InputName).obj
 
 SECTION .data
 

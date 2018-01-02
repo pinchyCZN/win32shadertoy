@@ -347,10 +347,6 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\DockingFeature\GoToLineDlg.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\NppPluginDemo.cpp"
 				>
 			</File>
@@ -374,7 +370,7 @@
 					>
 					<Tool
 						Name="VCCustomBuildTool"
-						CommandLine="nasm -t -f  win32 -o&quot;$(IntDir)\$(InputName).obj&quot; -Xvc &quot;$(InputName).asm&quot;"
+						CommandLine="nasmw -t -f  win32 -o&quot;$(IntDir)\$(InputName).obj&quot; -Xvc &quot;$(InputName).asm&quot;&#x0D;&#x0A;"
 						Outputs="$(IntDir)\$(InputName).obj"
 					/>
 				</FileConfiguration>
@@ -406,11 +402,11 @@
 				>
 			</File>
 			<File
-				RelativePath="DockingFeature\resource.h"
+				RelativePath=".\resource.h"
 				>
 			</File>
 			<File
-				RelativePath=".\resource.h"
+				RelativePath="DockingFeature\resource.h"
 				>
 			</File>
 			<File
