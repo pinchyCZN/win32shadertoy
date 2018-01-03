@@ -71,9 +71,7 @@ char *preamble=
 "\r\n"
 ;
 char *postamble=
-"\r\nvoid main(void){\r\n"
-"mainImage(gl_FragColor,gl_FragCoord);\r\n"
-"}\r\n"
+"void mainImage(out vec4,in vec2);void main(void){mainImage(gl_FragColor,gl_FragCoord);}\r\n"
 ;
 int move_console(int x,int y)
 {

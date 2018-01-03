@@ -269,7 +269,7 @@ void show_settings()
 {
 	DialogBoxParam(ghinstance,MAKEINTRESOURCE(IDD_SETTINGS),nppData._nppHandle,(DLGPROC)settings_proc,NULL);
 }
-int insert_preamble(HWND hscint,char *str,int len)
+int insert_selection(HWND hscint,char *str)
 {
 	int x,y,line;
 	x=SendMessage(hscint,SCI_GETSELECTIONSTART,0,0);
@@ -278,8 +278,6 @@ int insert_preamble(HWND hscint,char *str,int len)
 	SendMessage(hscint,SCI_SETSELECTIONSTART,0,0);
 	SendMessage(hscint,SCI_SETSELECTIONEND,0,0);
 	SendMessage(hscint,SCI_REPLACESEL,0,(LPARAM)str);
-	x+=len;
-	y+=len;
 	SendMessage(hscint,SCI_SETSELECTIONSTART,x,0);
 	SendMessage(hscint,SCI_SETSELECTIONEND,y,0);
 	return TRUE;
@@ -301,12 +299,13 @@ void compile_program()
 		SendMessage(hscint,SCI_GETTEXT,len,(LPARAM)buf);
 		buf[len-1]=0;
 		if(load_preamble){
-			int plen=strlen(preamble);
-			if(0!=strncmp(preamble,buf,plen)){
+			char *f=strstr(buf,preamble);
+			if(0==f){
 				char *tmp=(char*)malloc(MAX_BUF);
 				if(tmp){
-					insert_preamble(hscint,preamble,plen);
+					insert_selection(hscint,preamble);
 					_snprintf(tmp,MAX_BUF,"%s\r\n%s",preamble,buf);
+					tmp[MAX_BUF-1]=0;
 					free(buf);
 					buf=tmp;
 					len=MAX_BUF;
@@ -314,7 +313,18 @@ void compile_program()
 			}
 		}
 		if(use_new_format){
-			_snprintf(buf,len,"%s\r\b%s",buf,postamble);
+			char *f=strstr(buf,postamble);
+			if(0==f){
+				char *tmp=(char*)malloc(MAX_BUF);
+				if(tmp){
+					insert_selection(hscint,postamble);
+					_snprintf(tmp,MAX_BUF,"%s\r\n%s",buf,postamble);
+					tmp[MAX_BUF-1]=0;
+					free(buf);
+					buf=tmp;
+					len=MAX_BUF;
+				}
+			}
 		}
 		buf[len-1]=0;
 		printf("%s\n",buf);

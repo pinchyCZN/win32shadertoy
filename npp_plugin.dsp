@@ -101,10 +101,6 @@ SOURCE=.\debug_print.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\editor.c
-# End Source File
-# Begin Source File
-
 SOURCE=.\ini_file.c
 # End Source File
 # Begin Source File
@@ -169,6 +165,10 @@ InputName=textures
 # Begin Source File
 
 SOURCE=.\tjpgd.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\window.c
 # End Source File
 # End Group
 # Begin Group "Header Files"
