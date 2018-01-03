@@ -1,3 +1,4 @@
+#undef UNICODE
 #include <windows.h>
 #include <GL/gl.h>
 #include "glext.h"
@@ -8,7 +9,7 @@
 extern char *samples[];
 extern const char sample1[];
 
-extern int load_preamble;
+extern int load_preamble,use_new_format;
 extern int fragid,progid;
 extern int src_sample;
 extern HINSTANCE ghinstance;
@@ -92,16 +93,16 @@ struct DECOMPRESS_LIST{
 	struct TEXTURE_FILE *tf;
 };
 struct DECOMPRESS_LIST jpg_list[]={
-	{&tex00jpg,&tex00_512x512_RGB,&tex_files[0]},
-	{&tex01jpg,&tex01_1024x1024_RGB,&tex_files[1]},
-	{&tex02jpg,&tex02_512x512_RGB,&tex_files[2]},
-	{&tex03jpg,&tex03_512x512_RGB,&tex_files[3]},
-	{&tex04jpg,&tex04_512x512_RGB,&tex_files[4]},
-	{&tex05jpg,&tex05_1024x1024_RGB,&tex_files[5]},
-	{&tex06jpg,&tex06_1024x1024_RGB,&tex_files[6]},
-	{&tex07jpg,&tex07_1024x1024_RGB,&tex_files[7]},
-	{&tex08jpg,&tex08_512x512_RGB,&tex_files[8]},
-	{&tex09jpg,&tex09_1024x1024_RGB,&tex_files[9]}
+	{tex00jpg,&tex00_512x512_RGB,&tex_files[0]},
+	{tex01jpg,&tex01_1024x1024_RGB,&tex_files[1]},
+	{tex02jpg,&tex02_512x512_RGB,&tex_files[2]},
+	{tex03jpg,&tex03_512x512_RGB,&tex_files[3]},
+	{tex04jpg,&tex04_512x512_RGB,&tex_files[4]},
+	{tex05jpg,&tex05_1024x1024_RGB,&tex_files[5]},
+	{tex06jpg,&tex06_1024x1024_RGB,&tex_files[6]},
+	{tex07jpg,&tex07_1024x1024_RGB,&tex_files[7]},
+	{tex08jpg,&tex08_512x512_RGB,&tex_files[8]},
+	{tex09jpg,&tex09_1024x1024_RGB,&tex_files[9]}
 
 };
 struct FONT_NAME{
@@ -605,6 +606,8 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			SendDlgItemMessage(hwnd,IDC_SAMPLELIST,CB_SETCURSEL,src_sample,0);
 			if(load_preamble)
 				SendDlgItemMessage(hwnd,IDC_LOAD_PREAMBLE,BM_SETCHECK,BST_CHECKED,0);
+			if(use_new_format)
+				SendDlgItemMessage(hwnd,IDC_NEWFORMAT,BM_SETCHECK,BST_CHECKED,0);
 		}
 		break;
 	case WM_COMMAND:
@@ -624,6 +627,12 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				load_preamble=TRUE;
 			else
 				load_preamble=FALSE;
+			break;
+		case IDC_NEWFORMAT:
+			if(BST_CHECKED==SendMessage(lparam,BM_GETCHECK,0,0))
+				use_new_format=TRUE;
+			else
+				use_new_format=FALSE;
 			break;
 		case IDC_OPENINI:
 			{
@@ -667,12 +676,14 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			break;
 		case IDOK:
 			write_ini_value("EDITOR","LOAD_PREAMBLE",load_preamble);
+			write_ini_value("EDITOR","NEWFORMAT",use_new_format);
 			EndDialog(hwnd,0);
 			break;
 		}
 		break;
 	case WM_CLOSE:
 		EndDialog(hwnd,0);
+		break;
 	}
 	return 0;
 }

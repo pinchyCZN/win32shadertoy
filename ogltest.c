@@ -7,6 +7,12 @@
 #include "resource.h"
 #include "glext.h"
 
+#pragma warning(disable:4113)  //differs in parameter list
+#pragma warning(disable:4244) //conversion from blah to float
+#pragma warning(disable:4013) //undefined assume return int
+#pragma warning(disable:4047) //level indirection
+#pragma warning(disable:4024) //diff types for param
+
 extern const char sample1[],sample2[],sample3[];
 
 LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
@@ -46,6 +52,7 @@ HWND heditwin=0;
 HINSTANCE ghinstance=0;
 int fragid=0,progid=0;
 int load_preamble=TRUE;
+int use_new_format=FALSE;
 int src_sample=0;
 char start_dir[MAX_PATH]={0};
 
@@ -59,15 +66,21 @@ char *preamble=
 "uniform float     iChannelTime[4];       // channel playback time (in seconds)\r\n"
 "uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)\r\n"
 "uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click\r\n"
-"uniform vec4      iDate;                 // (year, month, day, time in seconds)\r\n\r\n"
+"uniform vec4      iDate;                 // (year, month, day, time in seconds)\r\n"
+"uniform float     iTime;                 // same as global time\r\n"
+"\r\n"
 ;
-
+char *postamble=
+"\r\nvoid main(void){\r\n"
+"mainImage(gl_FragColor,gl_FragCoord);\r\n"
+"}\r\n"
+;
 int move_console(int x,int y)
 {
-	BYTE Title[MAX_PATH]; 
+	char Title[MAX_PATH]; 
 	HANDLE hConWnd; 
-	GetConsoleTitle(Title,sizeof(Title));
-	hConWnd=FindWindow(NULL,Title);
+	GetConsoleTitleA(Title,sizeof(Title));
+	hConWnd=FindWindowA(NULL,Title);
 	if(hConWnd)
 		SetWindowPos(hConWnd,NULL,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER);
 	return 0;
@@ -82,9 +95,9 @@ void open_console()
 
 	if(consolecreated==TRUE)
 	{
-		GetConsoleTitle(title,sizeof(title));
+		GetConsoleTitleA(title,sizeof(title));
 		if(title[0]!=0){
-			hcon=FindWindow(NULL,title);
+			hcon=FindWindowA(NULL,title);
 			ShowWindow(hcon,SW_SHOW);
 		}
 		hcon=(HWND)GetStdHandle(STD_INPUT_HANDLE);
@@ -98,9 +111,9 @@ void open_console()
 	hf=_fdopen(hcrt,"w");
 	*stdout=*hf;
 	setvbuf(stdout,NULL,_IONBF,0);
-	GetConsoleTitle(title,sizeof(title));
+	GetConsoleTitleA(title,sizeof(title));
 	if(title[0]!=0){
-		hcon=FindWindow(NULL,title);
+		hcon=FindWindowA(NULL,title);
 		ShowWindow(hcon,SW_SHOW);
 		SetForegroundWindow(hcon);
 	}
@@ -136,7 +149,22 @@ int gl_check_compile(int id)
 	}
 	return result;
 }
-int load_shader_string(int id,char *str,HWND hedit)
+int compile_shader_str(char *str)
+{
+	int result=FALSE;
+	glShaderSource(fragid,1,&str,NULL);
+	glCompileShader(fragid);
+	if(gl_check_compile(fragid)){
+		glAttachShader(progid,fragid);
+		glLinkProgram(progid);
+		set_vars(progid);
+		printf("compile success!\n");
+		result=TRUE;
+	}
+	return result;
+}
+
+int load_shader_string(int id,const char *str,HWND hedit)
 {
 	char *buf,*pre="";
 	int blen,prelen;
@@ -156,7 +184,7 @@ int load_shader_string(int id,char *str,HWND hedit)
 		buf[blen-1]=0;
 		glShaderSource(id, 1, &buf, NULL);
 		if(hedit){
-			SetWindowText(hedit,buf);
+			SetWindowTextA(hedit,buf);
 		}
 		free(buf);
 	}
@@ -192,7 +220,7 @@ int load_frag_shader(GLuint id)
 		printf("cant open file %s\n",fname);
 		printf("loading sample instead,load other samples from settings dialog\n");
 		{
-			char *str;
+			const char *str;
 			int rnd;
 			srand(GetTickCount());
 			rnd=rand()&1;
@@ -361,7 +389,7 @@ int load_call_table()
 	glGetUniformfv=wglGetProcAddress("glGetUniformfv");
 	glGetUniformiv=wglGetProcAddress("glGetUniformfv");
 	if(glCreateShader==0){
-		MessageBox(hview,"Unable to load Open GL extensions","ERROR",MB_OK|MB_SYSTEMMODAL);
+		MessageBox(hview,TEXT("Unable to load Open GL extensions"),TEXT("ERROR"),MB_OK|MB_SYSTEMMODAL);
 		return FALSE;
 	}
 	return TRUE;
@@ -369,14 +397,11 @@ int load_call_table()
 int set_shaders(int *program,int fromfile)
 {
 	int result=FALSE;
-	static GLuint v=0,f=0,p=0;
+	GLuint v=0,f=0,p=0;
 
-	if(v==0)
-		v = glCreateShader(GL_VERTEX_SHADER);
-	if(f==0)
-		f = glCreateShader(GL_FRAGMENT_SHADER);
-	if(p==0)
-		p = glCreateProgram();
+	v = glCreateShader(GL_VERTEX_SHADER);
+	f = glCreateShader(GL_FRAGMENT_SHADER);
+	p = glCreateProgram();
 	fragid=f;
 	progid=p;
 
@@ -425,13 +450,13 @@ int setupPixelFormat(HDC hDC)
 
     pixelFormat = ChoosePixelFormat(hDC, &pfd);
     if (pixelFormat == 0) {
-        MessageBox(WindowFromDC(hDC), "ChoosePixelFormat failed.", "Error",
+        MessageBox(WindowFromDC(hDC),TEXT("ChoosePixelFormat failed."),TEXT("Error"),
                 MB_ICONERROR | MB_OK);
         exit(1);
     }
 
     if (SetPixelFormat(hDC, pixelFormat, &pfd) != TRUE) {
-        MessageBox(WindowFromDC(hDC), "SetPixelFormat failed.", "Error",
+        MessageBox(WindowFromDC(hDC),TEXT("SetPixelFormat failed."),TEXT("Error"),
                 MB_ICONERROR | MB_OK);
         exit(1);
     }
@@ -498,11 +523,11 @@ int compile(HWND hwin)
 		glLinkProgram(progid);
 		set_vars(progid);
 		printf("compile success!\n");
-		SetWindowText(hwin,"Shader code");
+		SetWindowTextA(hwin,"Shader code");
 		result=TRUE;
 	}
 	else
-		SetWindowText(hwin,"code ERROR!");
+		SetWindowTextA(hwin,"code ERROR!");
 	return result;
 }
 
@@ -515,7 +540,7 @@ int save_text(hedit,hstatus)
 		if(s){
 			FILE *f;
 			char path[MAX_PATH]={0};
-			GetWindowText(hedit,s,size);
+			GetWindowTextA(hedit,s,size);
 			load_current_path(path,sizeof(path));
 			f=fopen(path,"wb");
 			if(f){
@@ -523,7 +548,7 @@ int save_text(hedit,hstatus)
 				len=strlen(s);
 				fwrite(s,1,len,f);
 				fclose(f);
-				SetWindowText(hstatus,path);
+				SetWindowTextA(hstatus,path);
 			}
 			free(s);
 		}
@@ -556,7 +581,7 @@ int load_current(hedit)
 				memset(s,0,size);
 				fread(s,1,size-1,f);
 				fclose(f);
-				SetWindowText(hedit,s);
+				SetWindowTextA(hedit,s);
 				SendMessage(hedit,EM_EXSETSEL,0,&cr);
 			}
 			free(s);
@@ -564,7 +589,13 @@ int load_current(hedit)
 	}
 	return 0;
 }
-
+int load_settings()
+{
+	get_ini_value("EDITOR","LOAD_PREAMBLE",&load_preamble);
+	get_ini_value("EDITOR","NEWFORMAT",&use_new_format);
+	return TRUE;
+}
+#ifdef STANDALONE_EDITOR
 
 LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
@@ -586,13 +617,13 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				wglMakeCurrent(hDC,hGLRC);
 				load_call_table();
 			}
+			load_settings();
 			heditwin=CreateDialog(ghinstance,MAKEINTRESOURCE(IDD_SHADER_EDIT),0,WndEdit);
 			set_shaders(&program,TRUE);
 			load_textures();
 			if(heditwin){
 				SetWindowPos(heditwin,HWND_BOTTOM,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW);
 				restore_window(heditwin,"EDITOR");
-				get_ini_value("EDITOR","LOAD_PREAMBLE",&load_preamble);
 				PostMessage(hwnd,WM_APP,1,0);
 			}
 			{
@@ -608,6 +639,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			}
 			SetTimer(hwnd,1000,60,NULL);
 			move_console(0,sh/2);
+			pause=FALSE;
 		}
         return 0;
 	case WM_APP:
@@ -657,7 +689,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				lmb_down=FALSE;
 				break;
 			}
-			if(IDOK==MessageBox(hwnd,"OK to QUIT?","QUIT?",MB_OKCANCEL)){
+			if(IDOK==MessageBox(hwnd,TEXT("OK to QUIT?"),TEXT("QUIT?"),MB_OKCANCEL)){
 				EndDialog(hwnd,0);
 				PostQuitMessage(0);
 			}
@@ -717,7 +749,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 int create_view(HINSTANCE hInstance)
 {
     WNDCLASS wnd;
-	const char *class_name="Win32 SHADERTOY";
+	const TCHAR *class_name=TEXT("Win32 SHADERTOY");
 
 	memset(&wnd,0,sizeof(wnd));
 	wnd.style=CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
@@ -734,7 +766,7 @@ int create_view(HINSTANCE hInstance)
 	hview=CreateWindow(class_name,class_name,WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS|WS_VISIBLE,
 		0,0,640,480,NULL,NULL,hInstance,NULL);
 	if(!hview){
-		MessageBox(NULL,"Could not create main dialog","ERROR",MB_ICONERROR|MB_OK);
+		MessageBox(NULL,TEXT("Could not create main dialog"),TEXT("ERROR"),MB_ICONERROR|MB_OK);
 		exit(-1);
 	}
 	return 0;
@@ -744,8 +776,8 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 	MSG msg;
 	HACCEL haccel;
 	ghinstance=hInstance;
-	LoadLibrary("RICHED32.DLL");
-	GetCurrentDirectory(sizeof(start_dir),start_dir);
+	LoadLibraryA("RICHED32.DLL");
+	GetCurrentDirectoryA(sizeof(start_dir),start_dir);
 	init_ini_file();
 	open_console();
 	//create_view(hInstance);
@@ -771,3 +803,4 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 	return msg.wParam;
 
 }
+#endif //STANDALONE_EDITOR

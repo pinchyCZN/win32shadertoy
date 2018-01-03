@@ -29,6 +29,7 @@
 #define IDC_INSTALL_INFO                1027
 #define IDC_OPENINI                     1027
 #define IDC_USE_LOCAL                   1028
+#define IDC_NEWFORMAT                   1028
 #define IDC_USE_APPDATA                 1029
 #define IDC_NO_INI                      1030
 #define IDC_TXT_LOCAL                   1031
@@ -40,7 +41,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        108
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1028
+#define _APS_NEXT_CONTROL_VALUE         1029
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
