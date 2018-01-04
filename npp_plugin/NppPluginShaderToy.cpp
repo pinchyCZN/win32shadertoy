@@ -20,6 +20,7 @@
 #include <conio.h>
 #include <GL/gl.h>
 #include "PluginInterface.h"
+#include "menuCmdID.h"
 #include "resource.h"
 
 static NppData nppData={0};
@@ -239,7 +240,15 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	return 0;
 }
 
-
+int file_exist(WCHAR *path)
+{
+	int attrib;
+	attrib=GetFileAttributes(path);
+	if((attrib!=0xFFFFFFFF) && (!(attrib&FILE_ATTRIBUTE_DIRECTORY)))
+		return TRUE;
+	else
+		return FALSE;
+}
 void start_shadertoy()
 {
 #ifdef _DEBUG
@@ -252,8 +261,14 @@ void start_shadertoy()
 		SendMessage(nppData._nppHandle,NPPM_GETPLUGINSCONFIGDIR,sizeof(str),(LPARAM)str);
 		if(str[0]!=0){
 			_snwprintf(str,sizeof(str)/sizeof(TCHAR),L"%s\\%s",str,L"CURRENT.txt");
-			SendMessage(nppData._nppHandle,NPPM_DOOPEN,0,(LPARAM)str);
-			SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str);
+			if(file_exist(str)){
+				SendMessage(nppData._nppHandle,NPPM_DOOPEN,0,(LPARAM)str);
+				SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str);
+			}else{
+				PostMessage(nppData._nppHandle,NPPM_MENUCOMMAND,0,IDM_FILE_NEW);
+			}
+			PostMessage(nppData._nppHandle,NPPM_SETCURRENTLANGTYPE,0,L_C);
+			
 		}
 	}else{
 		ShowWindow(hshaderview,SW_SHOWNORMAL);

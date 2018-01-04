@@ -219,7 +219,11 @@ enum winVer{WV_UNKNOWN, WV_WIN32S, WV_95, WV_98, WV_ME, WV_NT, WV_W2K, WV_XP, WV
 	//Reloads Buffer
 	//wParam: Buffer to reload
 	//lParam: 0 if no alert, else alert
-
+	
+	#define NPPM_INTERNAL_SETFILENAME (NPPMSG + 63)
+	//wParam: BufferID to rename
+	//lParam: name to set (TCHAR*)
+	//Buffer must have been previously unnamed (eg "new 1" document types)
 
 	#define NPPM_GETBUFFERLANGTYPE (NPPMSG + 64)
 	//wParam: BufferID to get LangType from
