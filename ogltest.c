@@ -19,10 +19,13 @@ LRESULT CALLBACK WndEdit(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
 
 
 PFNGLCREATEPROGRAMPROC glCreateProgram;
+PFNGLDELETEPROGRAMPROC glDeleteProgram;
 PFNGLSHADERSOURCEPROC glShaderSource;
 PFNGLCOMPILESHADERPROC glCompileShader;
 PFNGLCREATESHADERPROC glCreateShader;
+PFNGLDELETESHADERPROC glDeleteShader;
 PFNGLATTACHSHADERPROC glAttachShader;
+PFNGLDETACHSHADERPROC glDetachShader;
 PFNGLLINKPROGRAMPROC glLinkProgram;
 PFNGLUSEPROGRAMPROC glUseProgram;
 
@@ -47,14 +50,16 @@ int screenw=1360;
 int screenh=768;
 int clickx=0,clicky=0;
 int lmb_down=FALSE;
-HWND hview=0;
+int frame_counter=0;
+HWND hshaderview=0;
 HWND heditwin=0;
 HINSTANCE ghinstance=0;
-int fragid=0,progid=0;
+int vertid=0,fragid=0,progid=0;
 int load_preamble=TRUE;
 int use_new_format=FALSE;
 int src_sample=0;
 char start_dir[MAX_PATH]={0};
+char *last_shader_str=0;
 
 char *preamble=
 "uniform vec3      iResolution;           // viewport resolution (in pixels)\r\n"
@@ -68,55 +73,14 @@ char *preamble=
 "uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click\r\n"
 "uniform vec4      iDate;                 // (year, month, day, time in seconds)\r\n"
 "uniform float     iTime;                 // same as global time\r\n"
+"uniform float     iTimeDelta;            // time since start\r\n"
+"uniform float     iFrame;                // frame counter\r\n"
 "\r\n"
 ;
 char *postamble=
 "void mainImage(out vec4,in vec2);void main(void){mainImage(gl_FragColor,gl_FragCoord);}\r\n"
 ;
-int move_console(int x,int y)
-{
-	char Title[MAX_PATH]; 
-	HANDLE hConWnd; 
-	GetConsoleTitleA(Title,sizeof(Title));
-	hConWnd=FindWindowA(NULL,Title);
-	if(hConWnd)
-		SetWindowPos(hConWnd,NULL,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER);
-	return 0;
-}
-void open_console()
-{
-	char title[MAX_PATH]={0};
-	HWND hcon;
-	FILE *hf;
-	static BYTE consolecreated=FALSE;
-	static int hcrt=0;
 
-	if(consolecreated==TRUE)
-	{
-		GetConsoleTitleA(title,sizeof(title));
-		if(title[0]!=0){
-			hcon=FindWindowA(NULL,title);
-			ShowWindow(hcon,SW_SHOW);
-		}
-		hcon=(HWND)GetStdHandle(STD_INPUT_HANDLE);
-		FlushConsoleInputBuffer(hcon);
-		return;
-	}
-	AllocConsole();
-	hcrt=_open_osfhandle((long)GetStdHandle(STD_OUTPUT_HANDLE),0x4000);
-
-	fflush(stdin);
-	hf=_fdopen(hcrt,"w");
-	*stdout=*hf;
-	setvbuf(stdout,NULL,_IONBF,0);
-	GetConsoleTitleA(title,sizeof(title));
-	if(title[0]!=0){
-		hcon=FindWindowA(NULL,title);
-		ShowWindow(hcon,SW_SHOW);
-		SetForegroundWindow(hcon);
-	}
-	consolecreated=TRUE;
-}
 const GLchar *vsh="\
 	varying vec4 p;\
 	void main(){\
@@ -124,7 +88,39 @@ const GLchar *vsh="\
 	gl_Position=gl_Vertex;\
 }";
 
-
+int setup_shaders()
+{
+	if(vertid!=0)
+		glDeleteShader(vertid);
+	if(fragid!=0){
+		if(progid!=0)
+			glDetachShader(progid,fragid);
+		glDeleteShader(fragid);
+	}
+	if(progid!=0)
+		glDeleteProgram(progid);
+	vertid=glCreateShader(GL_VERTEX_SHADER);
+	fragid=glCreateShader(GL_FRAGMENT_SHADER);
+	progid=glCreateProgram();
+	glShaderSource(vertid,1,&vsh,NULL);
+	glCompileShader(vertid);
+	return TRUE;
+}
+int save_shader_str(char *str)
+{
+	int result=FALSE;
+	char *tmp;
+	int len=strlen(str);
+	len++;
+	tmp=realloc(last_shader_str,len);
+	if(tmp){
+		last_shader_str=tmp;
+		strncpy(last_shader_str,str,len);
+		last_shader_str[len-1]=0;
+		result=TRUE;
+	}
+	return result;
+}
 int gl_check_compile(int id)
 {
 	int result=0;
@@ -147,14 +143,18 @@ int gl_check_compile(int id)
 	}
 	return result;
 }
-int compile_shader_str(char *str)
+int compile_shader_str(const char *str)
 {
 	int result=FALSE;
+	save_shader_str(str);
 	glShaderSource(fragid,1,&str,NULL);
 	glCompileShader(fragid);
 	if(gl_check_compile(fragid)){
+		glAttachShader(progid,vertid);
 		glAttachShader(progid,fragid);
 		glLinkProgram(progid);
+		glUseProgram(progid);
+		frame_counter=0;
 		set_vars(progid);
 		printf("compile success!\n");
 		result=TRUE;
@@ -162,10 +162,11 @@ int compile_shader_str(char *str)
 	return result;
 }
 
-int load_shader_string(int id,const char *str,HWND hedit)
+int load_shader_string(const char *str)
 {
 	char *buf,*pre="";
 	int blen,prelen;
+	int id=fragid;
 	blen=strlen(str)+4;
 	if(load_preamble){
 		int prelen=strlen(preamble);
@@ -180,15 +181,13 @@ int load_shader_string(int id,const char *str,HWND hedit)
 		memcpy(buf,pre,prelen);
 		strncpy(buf+prelen,str,blen-prelen);
 		buf[blen-1]=0;
+		save_shader_str(buf);
 		glShaderSource(id, 1, &buf, NULL);
-		if(hedit){
-			SetWindowTextA(hedit,buf);
-		}
 		free(buf);
 	}
 	return TRUE;
 }
-int load_frag_shader(GLuint id)
+int load_frag_shader()
 {
 	FILE *f;
 	char fname[MAX_PATH]="";
@@ -207,7 +206,7 @@ int load_frag_shader(GLuint id)
 			if(buf){
 				memset(buf,0,blen);
 				fread(buf,1,len,f);
-				load_shader_string(id,buf,GetDlgItem(heditwin,IDC_EDIT1));
+				load_shader_string(buf);
 				free(buf);
 			}
 
@@ -232,7 +231,7 @@ int load_frag_shader(GLuint id)
 			}
 			str=sample3;
 			src_sample=1;
-			load_shader_string(id,str,GetDlgItem(heditwin,IDC_EDIT1));
+			load_shader_string(str);
 		}
 	}
 	return 0;
@@ -310,6 +309,9 @@ int set_vars(GLuint p)
 	f[0]=ftime;
 	set_uniform_float(p,1,"iGlobalTime",f,1);
 	set_uniform_float(p,1,"iTime",f,1);
+	set_uniform_float(p,1,"iTimeDelta",f,1);
+	f[0]=frame_counter;
+	set_uniform_float(p,1,"iFrame",f,1);
 
 	f[0]=f[1]=f[2]=f[3]=ftime;
 	set_uniform_float(p,1,"iChannelTime",f,4);
@@ -334,7 +336,7 @@ int set_vars(GLuint p)
 	if(lmb_down){
 		POINT pt;
 		GetCursorPos(&pt);
-		MapWindowPoints(NULL,hview,&pt,1);
+		MapWindowPoints(NULL,hshaderview,&pt,1);
 		clickx=pt.x;
 		clicky=pt.y;
 		f[0]=pt.x;
@@ -364,66 +366,51 @@ int set_vars(GLuint p)
 }
 int load_call_table()
 {
-	glCreateShader=wglGetProcAddress("glCreateShader");
-	glCreateProgram=wglGetProcAddress("glCreateProgram");
-	glShaderSource=wglGetProcAddress("glShaderSource");
-	glCompileShader=wglGetProcAddress("glCompileShader");
-	glAttachShader=wglGetProcAddress("glAttachShader");
-	glLinkProgram=wglGetProcAddress("glLinkProgram");
-	glUseProgram=wglGetProcAddress("glUseProgram");
-	glGetShaderInfoLog=wglGetProcAddress("glGetShaderInfoLog");
-	glGetShaderiv=wglGetProcAddress("glGetShaderiv");
-
-	glGetUniformLocation=wglGetProcAddress("glGetUniformLocation");
-	glProgramUniform4fv=wglGetProcAddress("glProgramUniform4fv");
-	glProgramUniform3fv=wglGetProcAddress("glProgramUniform3fv");
-	glProgramUniform3f=wglGetProcAddress("glProgramUniform3f");
-	glProgramUniform2fv=wglGetProcAddress("glProgramUniform2fv");
-	glProgramUniform2f=wglGetProcAddress("glProgramUniform2f");
-	glProgramUniform1fv=wglGetProcAddress("glProgramUniform1fv");
-	glProgramUniform1f=wglGetProcAddress("glProgramUniform1f");
-	glProgramUniform1i=wglGetProcAddress("glProgramUniform1i");
-
-	glGetUniformfv=wglGetProcAddress("glGetUniformfv");
-	glGetUniformiv=wglGetProcAddress("glGetUniformfv");
-	if(glCreateShader==0){
-		MessageBox(hview,TEXT("Unable to load Open GL extensions"),TEXT("ERROR"),MB_OK|MB_SYSTEMMODAL);
-		return FALSE;
-	}
-	return TRUE;
-}
-int set_shaders(int *program,int fromfile)
-{
-	int result=FALSE;
-	GLuint v=0,f=0,p=0;
-
-	v = glCreateShader(GL_VERTEX_SHADER);
-	f = glCreateShader(GL_FRAGMENT_SHADER);
-	p = glCreateProgram();
-	fragid=f;
-	progid=p;
-
-	glShaderSource(v, 1, &vsh, NULL);
-	glCompileShader(v);
-	//glShaderSource(f, 1, &fsh, NULL);
-	if(fromfile)
-		load_frag_shader(f);
-
-	glCompileShader(f);
-	if(gl_check_compile(f)){
-		glAttachShader(p,v);
-		glAttachShader(p,f);
-		glLinkProgram(p);
-		set_vars(p);
-		glUseProgram(p);
-		if(program)
-			*program=p;
-		result=TRUE;
+	struct GL_FUNC{
+		void *(*fptr);
+		char *name;
+	};
+	struct GL_FUNC funcs[]={
+		{&glCreateProgram,"glCreateProgram"},
+		{&glDeleteProgram,"glDeleteProgram"},
+		{&glShaderSource,"glShaderSource"},
+		{&glCompileShader,"glCompileShader"},
+		{&glCreateShader,"glCreateShader"},
+		{&glDeleteShader,"glDeleteShader"},
+		{&glAttachShader,"glAttachShader"},
+		{&glDetachShader,"glDetachShader"},
+		{&glLinkProgram,"glLinkProgram"},
+		{&glUseProgram,"glUseProgram"},
+		{&glGetShaderiv,"glGetShaderiv"},
+		{&glGetShaderInfoLog,"glGetShaderInfoLog"},
+		{&glGetUniformLocation,"glGetUniformLocation"},
+		{&glProgramUniform1i,"glProgramUniform1i"},
+		{&glProgramUniform1f,"glProgramUniform1f"},
+		{&glProgramUniform1fv,"glProgramUniform1fv"},
+		{&glProgramUniform2f,"glProgramUniform2f"},
+		{&glProgramUniform2fv,"glProgramUniform2fv"},
+		{&glProgramUniform3f,"glProgramUniform3f"},
+		{&glProgramUniform3fv,"glProgramUniform3fv"},
+		{&glProgramUniform4fv,"glProgramUniform4fv"},
+		{&glGetUniformfv,"glGetUniformfv"},
+		{&glGetUniformiv,"glGetUniformiv"},
+	};
+	int i,result=TRUE;
+	for(i=0;i<sizeof(funcs)/sizeof(struct GL_FUNC);i++){
+		*funcs[i].fptr=wglGetProcAddress(funcs[i].name);
+		if(0==*funcs[i].fptr){
+			WCHAR tmp[80];
+			_snwprintf(tmp,sizeof(tmp),L"unable to load %S",funcs[i].name);
+			MessageBox(NULL,tmp,TEXT("ERROR"),MB_OK|MB_SYSTEMMODAL);
+			result=FALSE;
+			break;
+		}
 	}
 	return result;
 }
 int setupPixelFormat(HDC hDC)
 {
+	int result=FALSE;
     PIXELFORMATDESCRIPTOR pfd = {
         sizeof(PIXELFORMATDESCRIPTOR),  /* size */
         1,                              /* version */
@@ -450,22 +437,16 @@ int setupPixelFormat(HDC hDC)
     if (pixelFormat == 0) {
         MessageBox(WindowFromDC(hDC),TEXT("ChoosePixelFormat failed."),TEXT("Error"),
                 MB_ICONERROR | MB_OK);
-        exit(1);
+        return result;
     }
 
     if (SetPixelFormat(hDC, pixelFormat, &pfd) != TRUE) {
         MessageBox(WindowFromDC(hDC),TEXT("SetPixelFormat failed."),TEXT("Error"),
                 MB_ICONERROR | MB_OK);
-        exit(1);
+        return result;
     }
-	/*
-	PIXELFORMATDESCRIPTOR pfd;
-	memset(&pfd,0,sizeof(pfd));
-	pfd.cColorBits = pfd.cDepthBits = 32;
-	pfd.dwFlags    = PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-	SetPixelFormat(hDC,ChoosePixelFormat(hDC,&pfd),&pfd);
-	*/
-	return 0;
+	result=TRUE;
+	return result;
 }
 void perspectiveGL( GLdouble fovY, GLdouble aspect, GLdouble zNear, GLdouble zFar )
 {
@@ -519,13 +500,17 @@ int compile(HWND hwin)
 	if(gl_check_compile(fragid)){
 		glAttachShader(progid,fragid);
 		glLinkProgram(progid);
+		frame_counter=0;
 		set_vars(progid);
 		printf("compile success!\n");
-		SetWindowTextA(hwin,"Shader code");
+		if(hwin)
+			SetWindowTextA(hwin,"Shader code");
 		result=TRUE;
 	}
-	else
-		SetWindowTextA(hwin,"code ERROR!");
+	else{
+		if(hwin)
+			SetWindowTextA(hwin,"code ERROR!");
+	}
 	return result;
 }
 
@@ -599,7 +584,6 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	static HDC hDC=0;
 	static HGLRC hGLRC;
-	static int program=0;
 	switch(msg){
 	case WM_INITDIALOG:
 		{
@@ -617,7 +601,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			}
 			load_settings();
 			heditwin=CreateDialog(ghinstance,MAKEINTRESOURCE(IDD_SHADER_EDIT),0,WndEdit);
-			set_shaders(&program,TRUE);
+			set_shaders();
 			load_textures();
 			if(heditwin){
 				SetWindowPos(heditwin,HWND_BOTTOM,sw/2,0,sw/2,sh/2,SWP_SHOWWINDOW);
@@ -727,6 +711,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 					SwapBuffers(hDC);
 
 				set_vars(program);
+				frame_counter++;
 			}
 //			Sleep(1);
 //			InvalidateRect(hwnd,NULL,FALSE);

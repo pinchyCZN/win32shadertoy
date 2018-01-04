@@ -27,60 +27,7 @@ static NppData nppData={0};
 const int nbFunc = 5;
 static FuncItem funcItem[nbFunc]={0};
 static ShortcutKey skeys[nbFunc]={0};
-static HWND hshaderview;
 
-
-HWND ghconsole=0;
-int move_console(int x,int y,int w,int h)
-{
-	if(ghconsole!=0)
-		SetWindowPos(ghconsole,0,x,y,w,h,SWP_NOZORDER);
-	return 0;
-}
-#define _O_TEXT         0x4000  /* file mode is text (translated) */
-extern "C" int _open_osfhandle(long,int);
-void open_console()
-{
-	HWND hcon;
-	FILE *hf;
-	static BYTE consolecreated=FALSE;
-	static int hcrt=0;
-	static HWND (*GetConsoleWindow)(void)=0;
-
-	if(consolecreated==TRUE)
-	{
-		if(ghconsole!=0)
-			ShowWindow(ghconsole,SW_SHOW);
-		hcon=(HWND)GetStdHandle(STD_INPUT_HANDLE);
-		FlushConsoleInputBuffer(hcon);
-		return;
-	}
-	AllocConsole();
-	hcrt=_open_osfhandle((long)GetStdHandle(STD_OUTPUT_HANDLE),_O_TEXT);
-
-	fflush(stdin);
-	hf=_fdopen(hcrt,"w");
-	*stdout=*hf;
-	setvbuf(stdout,NULL,_IONBF,0);
-	consolecreated=TRUE;
-	if(GetConsoleWindow==0){
-		HMODULE hmod=LoadLibrary(TEXT("kernel32.dll"));
-		if(hmod!=0){
-			GetConsoleWindow=(HWND (*)(void))GetProcAddress(hmod,"GetConsoleWindow");
-			if(GetConsoleWindow!=0){
-				ghconsole=GetConsoleWindow();
-			}
-		}
-	}
-
-}
-void hide_console()
-{
-	if(ghconsole!=0){
-		ShowWindow(ghconsole,SW_HIDE);
-		SetForegroundWindow(ghconsole);
-	}
-}
 int assert(bool cond,char *msg)
 {
 #ifdef _DEBUG
@@ -91,9 +38,12 @@ int assert(bool cond,char *msg)
 }
 
 extern "C" {
+void open_console();
+void hide_console();
+void move_console(int,int,int,int);
 int setupPixelFormat(HDC hDC);
 int load_call_table();
-int set_shaders(int *program,int fromfile);
+int setup_shaders();
 int load_textures();
 int restore_window(HWND hwnd,const char *WINDOW_NAME);
 int set_vars(GLuint p);
@@ -106,11 +56,14 @@ int load_settings();
 extern HINSTANCE ghinstance;
 extern int screenw,screenh;
 extern int lmb_down,clickx,clicky;
+extern int frame_counter;
 extern int fragid,progid;
 extern int pause,load_preamble,use_new_format;
 extern char ini_file[MAX_PATH];
 extern char start_dir[MAX_PATH];
 extern char *preamble,*postamble;
+extern char *last_shader_str;
+extern HWND hshaderview;
 }
 
 
@@ -118,7 +71,6 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	static HDC hDC=0;
 	static HGLRC hGLRC;
-	static int program=0;
 	static int timer_id=0;
 	switch(msg){
 	case WM_INITDIALOG:
@@ -135,7 +87,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				wglMakeCurrent(hDC,hGLRC);
 				load_call_table();
 			}
-			set_shaders(&program,TRUE);
+			setup_shaders();
 			load_textures();
 			{
 			RECT rect;
@@ -146,7 +98,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			GetClientRect(hwnd,&rect);
 			screenw=rect.right-rect.left;
 			screenh=rect.bottom-rect.top;
-			set_vars(program);
+			set_vars(progid);
 			}
 			timer_id=SetTimer(hwnd,1000,60,NULL);
 			hshaderview=hwnd;
@@ -202,7 +154,7 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			screenh=HIWORD(lparam);
 			printf("screen res x=%i,y=%i\n",screenw,screenh);
 			reshape(screenw,screenh);
-			set_vars(program);
+			set_vars(progid);
 		}
 		return 0;
 		break;
@@ -220,7 +172,8 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				if(hDC)
 					SwapBuffers(hDC);
 
-				set_vars(program);
+				frame_counter++;
+				set_vars(progid);
 			}
 			return 0;
 		}
@@ -230,7 +183,6 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			save_window_pos(hwnd,"MAIN_WINDOW");
 		}
 		hide_console();
-		program=0;
 		KillTimer(hwnd,timer_id);
 		hshaderview=0;
 		wglDeleteContext(hGLRC);
@@ -238,51 +190,6 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		break;
 	}
 	return 0;
-}
-
-int file_exist(WCHAR *path)
-{
-	int attrib;
-	attrib=GetFileAttributes(path);
-	if((attrib!=0xFFFFFFFF) && (!(attrib&FILE_ATTRIBUTE_DIRECTORY)))
-		return TRUE;
-	else
-		return FALSE;
-}
-void start_shadertoy()
-{
-#ifdef _DEBUG
-		open_console();
-#endif
-	if(hshaderview==0){
-		CreateDialog((HINSTANCE)ghinstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),NULL,(DLGPROC)WndProc);
-		SetWindowPos(hshaderview,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW);
-		WCHAR str[MAX_PATH]={0};
-		SendMessage(nppData._nppHandle,NPPM_GETPLUGINSCONFIGDIR,sizeof(str),(LPARAM)str);
-		if(str[0]!=0){
-			_snwprintf(str,sizeof(str)/sizeof(TCHAR),L"%s\\%s",str,L"CURRENT.txt");
-			if(file_exist(str)){
-				SendMessage(nppData._nppHandle,NPPM_DOOPEN,0,(LPARAM)str);
-				SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str);
-			}else{
-				PostMessage(nppData._nppHandle,NPPM_MENUCOMMAND,0,IDM_FILE_NEW);
-			}
-			PostMessage(nppData._nppHandle,NPPM_SETCURRENTLANGTYPE,0,L_C);
-			
-		}
-	}else{
-		ShowWindow(hshaderview,SW_SHOWNORMAL);
-	}
-}
-void stop_shadertoy()
-{
-	if(hshaderview!=0){
-		PostMessage(hshaderview,WM_CLOSE,0,0);
-	}
-}
-void show_settings()
-{
-	DialogBoxParam(ghinstance,MAKEINTRESOURCE(IDD_SETTINGS),nppData._nppHandle,(DLGPROC)settings_proc,NULL);
 }
 int insert_selection(HWND hscint,char *str)
 {
@@ -297,7 +204,7 @@ int insert_selection(HWND hscint,char *str)
 	SendMessage(hscint,SCI_SETSELECTIONEND,y,0);
 	return TRUE;
 }
-void compile_program()
+extern "C" void compile_program()
 {
 #define MAX_BUF 0x400000
 	if(0==hshaderview)
@@ -342,11 +249,69 @@ void compile_program()
 			}
 		}
 		buf[len-1]=0;
-		printf("%s\n",buf);
+		//printf("%s\n",buf);
 		compile_shader_str(buf);
 		if(buf)
 			free(buf);
 	}
+}
+int file_exist(WCHAR *path)
+{
+	int attrib;
+	attrib=GetFileAttributes(path);
+	if((attrib!=0xFFFFFFFF) && (!(attrib&FILE_ATTRIBUTE_DIRECTORY)))
+		return TRUE;
+	else
+		return FALSE;
+}
+int set_scintilla_buffer(char *str)
+{
+	int result=FALSE;
+	if(str && nppData._scintillaMainHandle){
+		SendMessage(nppData._scintillaMainHandle,SCI_SETTEXT,0,(LPARAM)str);
+		result=TRUE;
+	}
+	return result;
+}
+void start_shadertoy()
+{
+#ifdef _DEBUG
+		open_console();
+#endif
+	if(hshaderview==0){
+		CreateDialog((HINSTANCE)ghinstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),NULL,(DLGPROC)WndProc);
+		SetWindowPos(hshaderview,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW);
+		WCHAR str[MAX_PATH]={0};
+		SendMessage(nppData._nppHandle,NPPM_GETPLUGINSCONFIGDIR,sizeof(str),(LPARAM)str);
+		if(str[0]!=0){
+			_snwprintf(str,sizeof(str)/sizeof(TCHAR),L"%s\\%s",str,L"CURRENT.txt");
+			if(file_exist(str)){
+				SendMessage(nppData._nppHandle,NPPM_DOOPEN,0,(LPARAM)str);
+				SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str);
+				SendMessage(nppData._nppHandle,NPPM_SETCURRENTLANGTYPE,0,L_C);
+			}else{
+				if(!SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str)){
+					int buf_id;
+					SendMessage(nppData._nppHandle,NPPM_MENUCOMMAND,0,IDM_FILE_NEW);
+					buf_id=SendMessage(nppData._nppHandle,NPPM_GETCURRENTBUFFERID,0,0);
+					SendMessage(nppData._nppHandle,NPPM_INTERNAL_SETFILENAME,buf_id,(LPARAM)str);
+				}
+			}
+			compile_program();
+		}
+	}else{
+		ShowWindow(hshaderview,SW_SHOWNORMAL);
+	}
+}
+void stop_shadertoy()
+{
+	if(hshaderview!=0){
+		PostMessage(hshaderview,WM_CLOSE,0,0);
+	}
+}
+void show_settings()
+{
+	DialogBoxParam(ghinstance,MAKEINTRESOURCE(IDD_SETTINGS),nppData._nppHandle,(DLGPROC)settings_proc,(LPARAM)set_scintilla_buffer);
 }
 void pause_program()
 {

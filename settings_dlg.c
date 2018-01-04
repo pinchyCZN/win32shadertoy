@@ -1,5 +1,6 @@
 #undef UNICODE
 #include <windows.h>
+#include <stdio.h>
 #include <GL/gl.h>
 #include "glext.h"
 #include "tjpgd.h"
@@ -438,7 +439,7 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			LPDRAWITEMSTRUCT lpDIS=lparam;
 			BITMAPINFO bmi;
 			HDC hdc;
-			int i,flags,selected=FALSE;
+			int i,selected=FALSE;
 			char *texbuf=0;
 			memset(&bmi,0,sizeof(bmi));
 			bmi.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
@@ -531,10 +532,10 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 }
 int toggle_window_size(HWND hwnd)
 {
-	extern HWND hview;
-	RECT rect,desk;
+	extern HWND hshaderview;
+	RECT rect;
 	int i,w,h,max;
-	GetWindowRect(hview,&rect);
+	GetWindowRect(hshaderview,&rect);
 	w=GetSystemMetrics(SM_CXSCREEN);
 	h=GetSystemMetrics(SM_CYSCREEN);
 	max=5;
@@ -546,7 +547,7 @@ int toggle_window_size(HWND hwnd)
 		sw=w/(2+i);
 		sh=h/(2+i);
 		if((rect.right-rect.left)>sw){
-			SetWindowPos(hview,NULL,0,0,sw,sh,SWP_NOZORDER);
+			SetWindowPos(hshaderview,NULL,0,0,sw,sh,SWP_NOZORDER);
 			if(hwnd){
 				if(i==(max-1))
 					SetDlgItemText(hwnd,IDC_TINY_WINDOW,"smallest");
@@ -554,7 +555,7 @@ int toggle_window_size(HWND hwnd)
 			break;
 		}
 		if(i==(max-1)){
-			SetWindowPos(hview,NULL,0,0,w/2,h/2,SWP_NOZORDER);
+			SetWindowPos(hshaderview,NULL,0,0,w/2,h/2,SWP_NOZORDER);
 		}
 
 	}
@@ -586,21 +587,26 @@ int populate_sample_list(HWND hlist,int cur_sel)
 
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
-	static HWND hedit=0;
+	extern void compile_program();
+	extern char *last_shader_str;
+	static int (*callback_set_buffer)(char *);
 	switch(msg){
 	case WM_INITDIALOG:
 		{
 			int i;
 			HFONT hfont;
 			LOGFONT lf={0};
-			hedit=lparam;
+			callback_set_buffer=lparam;
 			for(i=0;i<sizeof(font_names)/sizeof(struct FONT_NAME);i++)
 				SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,font_names[i].font_name);
-			hfont=SendMessage(hedit,WM_GETFONT,0,0);
-			if(hfont){
-				GetObject(hfont,sizeof(LOGFONT),&lf);
-				i=SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,lf.lfFaceName);
-				SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
+			if(IsWindow(heditwin)){
+				callback_set_buffer=0;
+				hfont=SendMessage(heditwin,WM_GETFONT,0,0);
+				if(hfont){
+					GetObject(hfont,sizeof(LOGFONT),&lf);
+					i=SendDlgItemMessage(hwnd,IDC_FONTS,CB_ADDSTRING,0,lf.lfFaceName);
+					SendDlgItemMessage(hwnd,IDC_FONTS,CB_SETCURSEL,i,0);
+				}
 			}
 			populate_sample_list(GetDlgItem(hwnd,IDC_SAMPLELIST),src_sample);
 			SendDlgItemMessage(hwnd,IDC_SAMPLELIST,CB_SETCURSEL,src_sample,0);
@@ -627,12 +633,14 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				load_preamble=TRUE;
 			else
 				load_preamble=FALSE;
+			SendMessage(hwnd,WM_COMMAND,MAKEWPARAM(IDC_SAMPLELIST,0),GetDlgItem(hwnd,IDC_SAMPLELIST));
 			break;
 		case IDC_NEWFORMAT:
 			if(BST_CHECKED==SendMessage(lparam,BM_GETCHECK,0,0))
 				use_new_format=TRUE;
 			else
 				use_new_format=FALSE;
+			SendMessage(hwnd,WM_COMMAND,MAKEWPARAM(IDC_SAMPLELIST,CBN_SELCHANGE),GetDlgItem(hwnd,IDC_SAMPLELIST));
 			break;
 		case IDC_OPENINI:
 			{
@@ -651,8 +659,10 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 						char *str;
 						src_sample=index;
 						str=samples[src_sample];
-						load_shader_string(fragid,str,GetDlgItem(heditwin,IDC_EDIT1));
-						compile(heditwin);
+						if(callback_set_buffer){
+							callback_set_buffer(str);
+							compile_program();
+						}
 					}
 				}
 			}
