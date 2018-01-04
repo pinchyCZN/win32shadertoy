@@ -633,14 +633,14 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				load_preamble=TRUE;
 			else
 				load_preamble=FALSE;
-			SendMessage(hwnd,WM_COMMAND,MAKEWPARAM(IDC_SAMPLELIST,0),GetDlgItem(hwnd,IDC_SAMPLELIST));
+			compile_program();
 			break;
 		case IDC_NEWFORMAT:
 			if(BST_CHECKED==SendMessage(lparam,BM_GETCHECK,0,0))
 				use_new_format=TRUE;
 			else
 				use_new_format=FALSE;
-			SendMessage(hwnd,WM_COMMAND,MAKEWPARAM(IDC_SAMPLELIST,CBN_SELCHANGE),GetDlgItem(hwnd,IDC_SAMPLELIST));
+			compile_program();
 			break;
 		case IDC_OPENINI:
 			{
@@ -649,6 +649,9 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 					explore=TRUE;
 				open_ini(hwnd,explore);
 			}
+			break;
+		case IDC_LOADSAMPLE:
+			SendMessage(hwnd,WM_COMMAND,MAKEWPARAM(IDC_SAMPLELIST,CBN_SELCHANGE),GetDlgItem(hwnd,IDC_SAMPLELIST));
 			break;
 		case IDC_SAMPLELIST:
 			{

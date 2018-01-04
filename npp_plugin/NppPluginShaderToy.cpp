@@ -56,6 +56,7 @@ int load_settings();
 extern HINSTANCE ghinstance;
 extern int screenw,screenh;
 extern int lmb_down,clickx,clicky;
+extern DWORD time_delta=0;
 extern int frame_counter;
 extern int fragid,progid;
 extern int pause,load_preamble,use_new_format;
@@ -66,7 +67,13 @@ extern char *last_shader_str;
 extern HWND hshaderview;
 }
 
-
+int snap_console(HWND hwin)
+{
+	RECT rect={0};
+	GetWindowRect(hwin,&rect);
+	move_console(rect.left,rect.bottom,0,0);
+	return TRUE;
+}
 LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	static HDC hDC=0;
@@ -155,8 +162,12 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			printf("screen res x=%i,y=%i\n",screenw,screenh);
 			reshape(screenw,screenh);
 			set_vars(progid);
+			snap_console(hwnd);
 		}
 		return 0;
+		break;
+	case WM_MOVE:
+		snap_console(hwnd);
 		break;
 	case WM_PAINT:
 		{
@@ -165,15 +176,19 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				;
 			}
 			else{
-
+				static DWORD tick=0;
+				DWORD ctick;
 				glRotatef(f,1,1,1);
 				glRecti(-1,-1,1,1);
 
 				if(hDC)
 					SwapBuffers(hDC);
 
-				frame_counter++;
 				set_vars(progid);
+				frame_counter++;
+				ctick=GetTickCount();
+				time_delta=ctick-tick;
+				tick=ctick;
 			}
 			return 0;
 		}
@@ -275,9 +290,7 @@ int set_scintilla_buffer(char *str)
 }
 void start_shadertoy()
 {
-#ifdef _DEBUG
-		open_console();
-#endif
+	open_console();
 	if(hshaderview==0){
 		CreateDialog((HINSTANCE)ghinstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),NULL,(DLGPROC)WndProc);
 		SetWindowPos(hshaderview,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW);
@@ -301,6 +314,11 @@ void start_shadertoy()
 		}
 	}else{
 		ShowWindow(hshaderview,SW_SHOWNORMAL);
+	}
+	if(hshaderview){
+		RECT rect;
+		GetWindowRect(hshaderview,&rect);
+		move_console(rect.left,rect.bottom,0,0);
 	}
 }
 void stop_shadertoy()

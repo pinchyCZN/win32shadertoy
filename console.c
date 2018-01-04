@@ -48,9 +48,19 @@ void hide_console()
 		SetForegroundWindow(ghconsole);
 	}
 }
-int move_console(int x,int y,int w,int h)
+void move_console(int x,int y,int w,int h)
 {
-	if(ghconsole!=0)
-		SetWindowPos(ghconsole,0,x,y,w,h,SWP_NOZORDER);
-	return 0;
+	int set_window_pos(HWND,int,int,int,int,int);
+	if(0==ghconsole)
+		return;
+	if(w==0 || h==0){
+		RECT rect;
+		GetWindowRect(ghconsole,&rect);
+		w=rect.right-rect.left;
+		h=rect.bottom-rect.top;
+		if(x==rect.left && y==rect.top)
+			return;
+	}
+	set_window_pos(ghconsole,x,y,w,h,0);
+	return;
 }

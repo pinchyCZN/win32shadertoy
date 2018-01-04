@@ -50,6 +50,8 @@ int screenw=1360;
 int screenh=768;
 int clickx=0,clicky=0;
 int lmb_down=FALSE;
+DWORD time_start=0;
+DWORD time_delta=0;
 int frame_counter=0;
 HWND hshaderview=0;
 HWND heditwin=0;
@@ -73,8 +75,8 @@ char *preamble=
 "uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click\r\n"
 "uniform vec4      iDate;                 // (year, month, day, time in seconds)\r\n"
 "uniform float     iTime;                 // same as global time\r\n"
-"uniform float     iTimeDelta;            // time since start\r\n"
-"uniform float     iFrame;                // frame counter\r\n"
+"uniform float     iTimeDelta;            // render time (in seconds)\r\n"
+"uniform float     iFrame;                // shader playback frame\r\n"
 "\r\n"
 ;
 char *postamble=
@@ -106,7 +108,7 @@ int setup_shaders()
 	glCompileShader(vertid);
 	return TRUE;
 }
-int save_shader_str(char *str)
+int save_shader_str(const char *str)
 {
 	int result=FALSE;
 	char *tmp;
@@ -155,6 +157,7 @@ int compile_shader_str(const char *str)
 		glLinkProgram(progid);
 		glUseProgram(progid);
 		frame_counter=0;
+		time_start=GetTickCount();
 		set_vars(progid);
 		printf("compile success!\n");
 		result=TRUE;
@@ -237,19 +240,17 @@ int load_frag_shader()
 	return 0;
 }
 
-int get_time(float *time)
+void get_time(float *time)
 {
-	static int init=FALSE;
-	static DWORD start;
 	DWORD delta;
-	if(!init){
-		start=GetTickCount();
-		init=TRUE;
-	}
-	delta=GetTickCount()-start;
+	delta=GetTickCount()-time_start;
 	if(time)
 		*time=(float)delta/(float)1000;
-	return delta/1000;
+}
+void get_delta_time(float *time)
+{
+	if(time)
+		*time=(float)time_delta/(float)1000;
 }
 
 int set_uniform_float(GLuint p,int type,char *name,float *flist,int count)
@@ -297,24 +298,25 @@ int set_uniform_int(GLuint p,char *name,int val)
 
 int set_vars(GLuint p)
 {
-	float f[4*3],ftime;
+	float f[4*3];
 	if(p==0)
 		return 0;
-	get_time(&ftime);
 
 	f[0]=screenw;
 	f[1]=screenh;
 	f[2]=0;
 	set_uniform_float(p,3,"iResolution",f,1);
-	f[0]=ftime;
+	get_time(&f[0]);
 	set_uniform_float(p,1,"iGlobalTime",f,1);
 	set_uniform_float(p,1,"iTime",f,1);
+	f[1]=f[2]=f[3]=f[0];
+	set_uniform_float(p,1,"iChannelTime",f,4);
+
+	get_delta_time(&f[0]);
 	set_uniform_float(p,1,"iTimeDelta",f,1);
 	f[0]=frame_counter;
 	set_uniform_float(p,1,"iFrame",f,1);
 
-	f[0]=f[1]=f[2]=f[3]=ftime;
-	set_uniform_float(p,1,"iChannelTime",f,4);
 	{
 		int j;
 		for(j=0;j<4;j++){
@@ -501,6 +503,7 @@ int compile(HWND hwin)
 		glAttachShader(progid,fragid);
 		glLinkProgram(progid);
 		frame_counter=0;
+		time_start=GetTickCount();
 		set_vars(progid);
 		printf("compile success!\n");
 		if(hwin)

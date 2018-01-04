@@ -16,18 +16,36 @@ int set_window_pos(HWND hwnd,int x,int y,int w,int h,int max)
 	mi.cbSize=sizeof(mi);
 	if(GetMonitorInfo(hmon,&mi)){
 		rect=mi.rcWork;
-		if(x>(rect.right-25) || x<(rect.left-25)
-			|| y<(rect.top-25) || y>(rect.bottom-25))
-			;
-		else{
-			if(w>0 && h>0){
-				int flags=SWP_NOZORDER;
-				if(max)
-					flags|=SW_MAXIMIZE;
-				SetWindowPos(hwnd,HWND_TOP,x,y,w,h,flags);
-				result=TRUE;
-			}
+		if((x+w)>rect.right)
+			x=rect.right-w;
+		if(x<rect.left)
+			x=rect.left;
+		if((y+h)>rect.bottom)
+			y=rect.bottom-h;
+		if(y<rect.top)
+			y=rect.top;
+		if(w>0 && h>0){
+			int rw,rh;
+			rw=rect.right-rect.left;
+			rh=rect.bottom-rect.top;
+			if(w>rw)
+				w=rw;
+			if(h>rh)
+				h=rh;
+			if(w<25)
+				w=25;
+			if(h<25)
+				h=25;
 		}
+		{
+			int flags=SWP_NOZORDER;
+			if(max)
+				flags|=SW_MAXIMIZE;
+			if(w==0 || h==0)
+				flags|=SWP_NOSIZE;
+			SetWindowPos(hwnd,HWND_TOP,x,y,w,h,flags);
+		}
+		result=TRUE;
 	}
 	return result;
 }
