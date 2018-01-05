@@ -10,7 +10,7 @@
 extern char *samples[];
 extern const char sample1[];
 
-extern int load_preamble,use_new_format;
+extern int load_preamble,use_new_format,compile_on_modify;
 extern int fragid,progid;
 extern int src_sample;
 extern HINSTANCE ghinstance;
@@ -584,7 +584,14 @@ int populate_sample_list(HWND hlist,int cur_sel)
 	}
 	return i;
 }
-
+int check_modify_val(HWND hcheck,int *val)
+{
+	if(BST_CHECKED==SendMessage(hcheck,BM_GETCHECK,0,0))
+		*val=TRUE;
+	else
+		*val=FALSE;
+	return *val;
+}
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	extern void compile_program();
@@ -618,29 +625,16 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		break;
 	case WM_COMMAND:
 		switch(LOWORD(wparam)){
-		case IDC_FONTS:
-			if(HIWORD(wparam)==CBN_SELENDOK){
-				int font;
-				char str[80]={0};
-				GetDlgItemText(hwnd,IDC_FONTS,str,sizeof(str));
-				font=fontname_to_int(str);
-				SendDlgItemMessage(heditwin,IDC_EDIT1,WM_SETFONT,GetStockObject(font),0);
-				InvalidateRect(GetDlgItem(heditwin,IDC_EDIT1),NULL,TRUE);
-			}
-			break;
 		case IDC_LOAD_PREAMBLE:
-			if(BST_CHECKED==SendMessage(lparam,BM_GETCHECK,0,0))
-				load_preamble=TRUE;
-			else
-				load_preamble=FALSE;
+			check_modify_val(lparam,&load_preamble);
 			compile_program();
 			break;
 		case IDC_NEWFORMAT:
-			if(BST_CHECKED==SendMessage(lparam,BM_GETCHECK,0,0))
-				use_new_format=TRUE;
-			else
-				use_new_format=FALSE;
+			check_modify_val(lparam,&use_new_format);
 			compile_program();
+			break;
+		case IDC_COMPILE_ON_MODIFY:
+			check_modify_val(lparam,&compile_on_modify);
 			break;
 		case IDC_OPENINI:
 			{
@@ -663,8 +657,11 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 						src_sample=index;
 						str=samples[src_sample];
 						if(callback_set_buffer){
+							int tmp=compile_on_modify;
+							compile_on_modify=FALSE;
 							callback_set_buffer(str);
 							compile_program();
+							compile_on_modify=tmp;
 						}
 					}
 				}
@@ -688,8 +685,7 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			EndDialog(hwnd,0);
 			break;
 		case IDOK:
-			write_ini_value("EDITOR","LOAD_PREAMBLE",load_preamble);
-			write_ini_value("EDITOR","NEWFORMAT",use_new_format);
+			save_settings();
 			EndDialog(hwnd,0);
 			break;
 		}

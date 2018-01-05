@@ -59,7 +59,7 @@ extern int lmb_down,clickx,clicky;
 extern DWORD time_delta;
 extern int frame_counter;
 extern int fragid,progid;
-extern int pause,load_preamble,use_new_format;
+extern int pause,load_preamble,use_new_format,compile_on_modify;
 extern char ini_file[MAX_PATH];
 extern char start_dir[MAX_PATH];
 extern char *preamble,*postamble;
@@ -432,32 +432,22 @@ extern "C" __declspec(dllexport) FuncItem * getFuncsArray(int *nbF)
 
 extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 {
+//	if(notifyCode->nmhdr.code!=2013)
+//		printf("code=%i\n",notifyCode->nmhdr.code);
 	switch (notifyCode->nmhdr.code) 
 	{
-		case NPPN_SHUTDOWN:
-		{
-//			commandMenuCleanUp();
-		}
+	case SCN_MODIFIED:
+		if(compile_on_modify)
+			compile_program();
 		break;
-
-		default:
-			return;
+	default:
+		return;
 	}
 }
 
 
-// Here you can process the Npp Messages 
-// I will make the messages accessible little by little, according to the need of plugin development.
-// Please let me know if you need to access to some messages :
-// http://sourceforge.net/forum/forum.php?forum_id=482781
-//
 extern "C" __declspec(dllexport) LRESULT messageProc(UINT Message, WPARAM wParam, LPARAM lParam)
-{/*
-	if (Message == WM_MOVE)
-	{
-		::MessageBox(NULL, "move", "", MB_OK);
-	}
-*/
+{
 	return TRUE;
 }
 

@@ -59,6 +59,7 @@ HINSTANCE ghinstance=0;
 int vertid=0,fragid=0,progid=0;
 int load_preamble=TRUE;
 int use_new_format=FALSE;
+int compile_on_modify=FALSE;
 int src_sample=0;
 char start_dir[MAX_PATH]={0};
 char *last_shader_str=0;
@@ -77,7 +78,6 @@ char *preamble=
 "uniform float     iTime;                 // same as global time\r\n"
 "uniform float     iTimeDelta;            // render time (in seconds)\r\n"
 "uniform float     iFrame;                // shader playback frame\r\n"
-"\r\n"
 ;
 char *postamble=
 "void mainImage(out vec4,in vec2);void main(void){mainImage(gl_FragColor,gl_FragCoord);}\r\n"
@@ -470,7 +470,6 @@ void reshape(int w, int h)
 }
 int insert_preamble(HWND hedit,char *buf,int len)
 {
-	//static const char *_preamble="test";
 	char *pre=preamble;
 	int prelen=strlen(pre);
 	if(memcmp(buf,pre,prelen)!=0){
@@ -575,9 +574,28 @@ int load_current(hedit)
 	}
 	return 0;
 }
+struct SETTING{
+	char *key;
+	int *val;
+};
+const struct SETTING editor_settings[]={
+	{"LOAD_PREAMBLE",&load_preamble},
+	{"NEWFORMAT",&use_new_format},
+	{"COMPILE_ON_MODIFY",&compile_on_modify},
+};
 int load_settings()
 {
-	get_ini_value("EDITOR","LOAD_PREAMBLE",&load_preamble);
-	get_ini_value("EDITOR","NEWFORMAT",&use_new_format);
+	int i;
+	for(i=0;i<sizeof(editor_settings)/sizeof(struct SETTING);i++){
+		get_ini_value("EDITOR",editor_settings[i].key,editor_settings[i].val);
+	}
+	return TRUE;
+}
+int save_settings()
+{
+	int i;
+	for(i=0;i<sizeof(editor_settings)/sizeof(struct SETTING);i++){
+		write_ini_value("EDITOR",editor_settings[i].key,*editor_settings[i].val);
+	}
 	return TRUE;
 }
