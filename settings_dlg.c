@@ -592,6 +592,12 @@ int check_modify_val(HWND hcheck,int *val)
 		*val=FALSE;
 	return *val;
 }
+int set_checkbox(HWND hwnd,int idc,int val)
+{
+	if(val)
+		SendDlgItemMessage(hwnd,idc,BM_SETCHECK,BST_CHECKED,0);
+	return TRUE;
+}
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	extern void compile_program();
@@ -617,10 +623,9 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			}
 			populate_sample_list(GetDlgItem(hwnd,IDC_SAMPLELIST),src_sample);
 			SendDlgItemMessage(hwnd,IDC_SAMPLELIST,CB_SETCURSEL,src_sample,0);
-			if(load_preamble)
-				SendDlgItemMessage(hwnd,IDC_LOAD_PREAMBLE,BM_SETCHECK,BST_CHECKED,0);
-			if(use_new_format)
-				SendDlgItemMessage(hwnd,IDC_NEWFORMAT,BM_SETCHECK,BST_CHECKED,0);
+			set_checkbox(hwnd,IDC_LOAD_PREAMBLE,load_preamble);
+			set_checkbox(hwnd,IDC_NEWFORMAT,use_new_format);
+			set_checkbox(hwnd,IDC_COMPILE_ON_MODIFY,compile_on_modify);
 		}
 		break;
 	case WM_COMMAND:
