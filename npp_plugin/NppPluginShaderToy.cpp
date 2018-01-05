@@ -56,7 +56,7 @@ int load_settings();
 extern HINSTANCE ghinstance;
 extern int screenw,screenh;
 extern int lmb_down,clickx,clicky;
-extern DWORD time_delta=0;
+extern DWORD time_delta;
 extern int frame_counter;
 extern int fragid,progid;
 extern int pause,load_preamble,use_new_format;
@@ -308,6 +308,7 @@ void start_shadertoy()
 					SendMessage(nppData._nppHandle,NPPM_MENUCOMMAND,0,IDM_FILE_NEW);
 					buf_id=SendMessage(nppData._nppHandle,NPPM_GETCURRENTBUFFERID,0,0);
 					SendMessage(nppData._nppHandle,NPPM_INTERNAL_SETFILENAME,buf_id,(LPARAM)str);
+					SendMessage(nppData._nppHandle,NPPM_SETCURRENTLANGTYPE,0,L_C);
 				}
 			}
 			compile_program();
