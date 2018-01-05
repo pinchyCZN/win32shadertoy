@@ -74,6 +74,13 @@ int snap_console(HWND hwin)
 	move_console(rect.left,rect.bottom,0,0);
 	return TRUE;
 }
+int print_info()
+{
+	printf("time delta=%i\n",time_delta);
+	printf("pause=%i\n",pause);
+	printf("click x/y=%i %i\n",clickx,clicky);
+	return 0;
+}
 LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	static HDC hDC=0;
@@ -98,9 +105,9 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			load_textures();
 			{
 			RECT rect;
-			//SetWindowPos(hwnd,HWND_TOP,0,0,sw/2,sh/2,0);
 			SetWindowPos(hwnd,HWND_TOP,0,0,sw/(2+4),sh/(2+4),0);
 			restore_window(hwnd,"MAIN_WINDOW");
+			SetClassLong(hwnd,GCL_HICON,(LONG)LoadIcon(ghinstance,MAKEINTRESOURCE(IDI_ICON1)));
 
 			GetClientRect(hwnd,&rect);
 			screenw=rect.right-rect.left;
@@ -110,24 +117,26 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			timer_id=SetTimer(hwnd,1000,60,NULL);
 			hshaderview=hwnd;
 			pause=FALSE;
-			//move_console(0,sh/2);
 		}
         return 0;
+	case WM_LBUTTONDBLCLK:
+		if(IsZoomed(hwnd))
+			ShowWindow(hwnd,SW_SHOWNORMAL);
+		else
+			ShowWindow(hwnd,SW_SHOWMAXIMIZED);
+		break;
 	case WM_APP:
 		break;
 	case WM_TIMER:
 		InvalidateRect(hwnd,NULL,FALSE);
 		return 0;
 	case WM_COMMAND:
+		/*
 		switch(LOWORD(wparam)){
-		case IDC_TINY_WINDOW:
-			toggle_window_size(0);
-			break;
-		case IDC_PAUSE:
-			{
-			}
+		default:
 			break;
 		}
+		*/
 		break;
 	case WM_LBUTTONUP:
 		ReleaseCapture();
@@ -139,19 +148,16 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		clickx=LOWORD(lparam);
 		clicky=screenh-HIWORD(lparam);
 		break;
+	case WM_RBUTTONDOWN:
+		print_info();
+		break;
 	case WM_KEYDOWN:
 		switch(wparam){
 		case VK_ESCAPE:
-			if(lmb_down){
-				lmb_down=FALSE;
-				break;
-			}
-			if(IDOK==MessageBox(hwnd,TEXT("OK to QUIT?"),TEXT("QUIT?"),MB_OKCANCEL)){
-				EndDialog(hwnd,0);
-				PostQuitMessage(0);
-			}
 			break;
 		case VK_F1:
+			print_info();
+			return TRUE;
 			break;
 		}
 		break;

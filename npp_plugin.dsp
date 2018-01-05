@@ -186,6 +186,10 @@ SOURCE=.\window.c
 
 SOURCE=.\resource.rc
 # End Source File
+# Begin Source File
+
+SOURCE=.\shader_toy.ico
+# End Source File
 # End Group
 # End Target
 # End Project
