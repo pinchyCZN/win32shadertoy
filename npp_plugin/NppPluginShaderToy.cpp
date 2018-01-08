@@ -53,6 +53,7 @@ int save_window_pos(HWND hwnd,const char *WINDOW_NAME);
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
 int compile_shader_str(char *str);
 int load_settings();
+int needs_main_preamble(char *str);
 extern HINSTANCE ghinstance;
 extern int screenw,screenh;
 extern int lmb_down,clickx,clicky;
@@ -62,7 +63,7 @@ extern int fragid,progid;
 extern int pause,load_preamble,use_new_format,compile_on_modify;
 extern char ini_file[MAX_PATH];
 extern char start_dir[MAX_PATH];
-extern char *preamble,*postamble;
+extern char *preamble,*main_preamble;
 extern char *last_shader_str;
 extern HWND hshaderview;
 }
@@ -225,6 +226,7 @@ int insert_selection(HWND hscint,char *str)
 	SendMessage(hscint,SCI_SETSELECTIONEND,y,0);
 	return TRUE;
 }
+
 extern "C" void compile_program()
 {
 #define MAX_BUF 0x400000
@@ -256,16 +258,19 @@ extern "C" void compile_program()
 			}
 		}
 		if(use_new_format){
-			char *f=strstr(buf,postamble);
-			if(0==f){
-				char *tmp=(char*)malloc(MAX_BUF);
-				if(tmp){
-					insert_selection(hscint,postamble);
-					_snprintf(tmp,MAX_BUF,"%s\r\n%s",buf,postamble);
-					tmp[MAX_BUF-1]=0;
-					free(buf);
-					buf=tmp;
-					len=MAX_BUF;
+			if(needs_main_preamble(buf)){
+				char *f=strstr(buf,main_preamble);
+				if(0==f){
+					char *tmp=(char*)malloc(MAX_BUF);
+					if(tmp){
+						printf("new format detected\n");
+						insert_selection(hscint,main_preamble);
+						_snprintf(tmp,MAX_BUF,"%s\r\n%s",buf,main_preamble);
+						tmp[MAX_BUF-1]=0;
+						free(buf);
+						buf=tmp;
+						len=MAX_BUF;
+					}
 				}
 			}
 		}

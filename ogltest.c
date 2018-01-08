@@ -79,7 +79,7 @@ char *preamble=
 "uniform float     iTimeDelta;            // render time (in seconds)\r\n"
 "uniform float     iFrame;                // shader playback frame\r\n"
 ;
-char *postamble=
+char *main_preamble=
 "void mainImage(out vec4,in vec2);void main(void){mainImage(gl_FragColor,gl_FragCoord);}\r\n"
 ;
 
@@ -90,6 +90,75 @@ const GLchar *vsh="\
 	gl_Position=gl_Vertex;\
 }";
 
+int match_word_state(const char *str,int *index,char a,char prev,int *state,int next)
+{
+	char b;
+	int count=*index;
+	if(0==count){
+		if(!isspace(a)){
+			b=str[count];
+			if(isspace(prev)){
+				if(a==b)
+					*index=*index+1;
+				else
+					*state=0;
+			}else{
+				*state=0;
+			}
+		}
+	}else{
+		b=str[count];
+		*index=count+1;
+		if(a!=b)
+			*state=0;
+		else{
+			b=str[count+1];
+			if(b==0){
+				*state=next;
+				*index=0;
+			}
+		}
+	}
+	return *state;
+}
+int needs_main_preamble(char *str)
+{
+	int i=0,state=0,count=0;
+	char a,prev=0;
+	int result=FALSE;
+	const char *str1="void";
+	const char *str2="mainImage";
+	for(i=0;a=str[i];i++){
+		switch(state){
+		case 0:
+			count=0;
+			if(isspace(a))
+				state=1;
+			break;
+		case 1:
+			match_word_state(str1,&count,a,prev,&state,2);
+			break;
+		case 2:
+			match_word_state(str2,&count,a,prev,&state,3);
+			break;
+		case 3:
+			if(isspace(a))
+				state=3;
+			else if(a=='('){
+				state=0;
+				result=TRUE;
+			}
+			break;
+		default:
+			state=0;
+			break;
+		}
+		prev=a;
+		if(result)
+			break;
+	}
+	return result;
+}
 int setup_shaders()
 {
 	if(vertid!=0)
