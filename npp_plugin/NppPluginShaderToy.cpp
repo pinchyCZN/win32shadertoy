@@ -303,8 +303,8 @@ void start_shadertoy()
 {
 	open_console();
 	if(hshaderview==0){
-		CreateDialog((HINSTANCE)ghinstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),NULL,(DLGPROC)WndProc);
-		SetWindowPos(hshaderview,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW);
+		CreateDialog((HINSTANCE)ghinstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),nppData._nppHandle,(DLGPROC)WndProc);
+		SetWindowPos(hshaderview,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW|SWP_NOZORDER);
 		WCHAR str[MAX_PATH]={0};
 		SendMessage(nppData._nppHandle,NPPM_GETPLUGINSCONFIGDIR,sizeof(str),(LPARAM)str);
 		if(str[0]!=0){
@@ -453,6 +453,7 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 
 extern "C" __declspec(dllexport) LRESULT messageProc(UINT Message, WPARAM wParam, LPARAM lParam)
 {
+	printf("message=%i\n",Message);
 	return TRUE;
 }
 
