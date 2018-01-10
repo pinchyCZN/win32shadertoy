@@ -927,7 +927,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     {
         vec3 ocol = textureLod( iChannel0, spos, 0.0 ).xyz;
     	if( iFrame==0 ) ocol = col;
-        col = mix( ocol, col, 0.1 );
+        //col = mix( ocol, col, 0.1 );
     }
 
     //----------------------------------

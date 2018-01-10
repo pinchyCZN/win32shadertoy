@@ -25,6 +25,7 @@ extern unsigned char tex06jpg[];
 extern unsigned char tex07jpg[];
 extern unsigned char tex08jpg[];
 extern unsigned char tex09jpg[];
+extern unsigned char blankjpg[];
 
 unsigned char *tex00_512x512_RGB=0;
 unsigned char *tex01_1024x1024_RGB=0;
@@ -36,6 +37,7 @@ unsigned char *tex06_1024x1024_RGB=0;
 unsigned char *tex07_1024x1024_RGB=0;
 unsigned char *tex08_512x512_RGB=0;
 unsigned char *tex09_1024x1024_RGB=0;
+static unsigned char blank_512x512_RGB[512*512*3]={0};
 
 extern unsigned char tex10_64x64_L[];
 extern unsigned char tex11_64x64_RGBA[];
@@ -51,6 +53,7 @@ struct TEXTURE_FILE{
 	char *data;
 	int w,h;
 	int bpp;
+	unsigned char *src;
 };
 struct TEX_BUTTON{
 	HWND hwnd;
@@ -65,46 +68,29 @@ struct GL_TEXTURE_INFO{
 };
 //int gltexture1=0,gltexture2=0,gltexture3=0,gltexture4=0;
 struct GL_TEXTURE_INFO gl_textures[4]={0};
-#define NUM_TEXTURES 16
-static struct TEX_BUTTON buttons[NUM_TEXTURES];
+#define TEXTURE_BUTTONS 20
+static struct TEX_BUTTON buttons[TEXTURE_BUTTONS];
 
 
 
 struct TEXTURE_FILE tex_files[]={
-	{"tex00_512x512_RGB",0,512,512,3},
-	{"tex01_1024x1024_RGB",0,1024,1024,3},
-	{"tex02_512x512_RGB",0,512,512,3},
-	{"tex03_512x512_RGB",0,512,512,3},
-	{"tex04_512x512_RGB",0,512,512,3},
-	{"tex05_1024x1024_RGB",0,1024,1024,3},
-	{"tex06_1024x1024_RGB",0,1024,1024,3},
-	{"tex07_1024x1024_RGB",0,1024,1024,3},
-	{"tex08_512x512_RGB",0,512,512,3},
-	{"tex09_1024x1024_RGB",0,1024,1024,3},
-	{"tex10_64x64_L",tex10_64x64_L,64,64,1},
-	{"tex11_64x64_RGBA",tex11_64x64_RGBA,64,64,4},
-	{"tex12_256x256_L",tex12_256x256_L,256,256,1},
-	{"tex14_256x32_RGBA",tex14_256x32_RGBA,256,32,4},
-	{"tex15_8x8_L",tex15_8x8_L,8,8,1},
-	{"tex16_256x256_RGBA",tex16_256x256_RGBA,256,256,4}
-};
-struct DECOMPRESS_LIST{
-	unsigned char *src;
-	unsigned char **dst;
-	struct TEXTURE_FILE *tf;
-};
-struct DECOMPRESS_LIST jpg_list[]={
-	{tex00jpg,&tex00_512x512_RGB,&tex_files[0]},
-	{tex01jpg,&tex01_1024x1024_RGB,&tex_files[1]},
-	{tex02jpg,&tex02_512x512_RGB,&tex_files[2]},
-	{tex03jpg,&tex03_512x512_RGB,&tex_files[3]},
-	{tex04jpg,&tex04_512x512_RGB,&tex_files[4]},
-	{tex05jpg,&tex05_1024x1024_RGB,&tex_files[5]},
-	{tex06jpg,&tex06_1024x1024_RGB,&tex_files[6]},
-	{tex07jpg,&tex07_1024x1024_RGB,&tex_files[7]},
-	{tex08jpg,&tex08_512x512_RGB,&tex_files[8]},
-	{tex09jpg,&tex09_1024x1024_RGB,&tex_files[9]}
-
+	{"tex00_512x512_RGB",  0,512,512,3,  {&tex00jpg}},
+	{"tex01_1024x1024_RGB",0,1024,1024,3,{&tex01jpg}},
+	{"tex02_512x512_RGB",  0,512,512,3,  {&tex02jpg}},
+	{"tex03_512x512_RGB",  0,512,512,3,  {&tex03jpg}},
+	{"tex04_512x512_RGB",  0,512,512,3,  {&tex04jpg}},
+	{"tex05_1024x1024_RGB",0,1024,1024,3,{&tex05jpg}},
+	{"tex06_1024x1024_RGB",0,1024,1024,3,{&tex06jpg}},
+	{"tex07_1024x1024_RGB",0,1024,1024,3,{&tex07jpg}},
+	{"tex08_512x512_RGB",  0,512,512,3,  {&tex08jpg}},
+	{"tex09_1024x1024_RGB",0,1024,1024,3,{&tex09jpg}},
+	{"tex10_64x64_L",     tex10_64x64_L,64,64,1},
+	{"tex11_64x64_RGBA",  tex11_64x64_RGBA,64,64,4},
+	{"tex12_256x256_L",   tex12_256x256_L,256,256,1},
+	{"tex14_256x32_RGBA", tex14_256x32_RGBA,256,32,4},
+	{"tex15_8x8_L",       tex15_8x8_L,8,8,1},
+	{"tex16_256x256_RGBA",tex16_256x256_RGBA,256,256,4},
+	{"blank 512x512",     blank_512x512_RGB,512,512,3},
 };
 struct FONT_NAME{
 	int font_num;
@@ -297,14 +283,27 @@ int init_texture_buttons()
 {
 	static int load_buttons=TRUE;
 	if(load_buttons){
-		int i;
+		int i,count=0,blank_index=0;
 		load_buttons=FALSE;
 		for(i=0;i<sizeof(tex_files)/sizeof(struct TEXTURE_FILE);i++){
-			buttons[i].tfile=&tex_files[i];
-			buttons[i].thumb=malloc(64*64*3);
-			if(buttons[i].thumb){
+			if(count>=TEXTURE_BUTTONS)
+				break;
+			buttons[count].tfile=&tex_files[i];
+			buttons[count].thumb=malloc(64*64*3);
+			if(buttons[count].thumb){
 				downsample(tex_files[i].data,tex_files[i].w,tex_files[i].h,tex_files[i].bpp,buttons[i].thumb,64,64);
 			}
+			count++;
+		}
+		for(i=0;i<sizeof(tex_files)/sizeof(struct TEXTURE_FILE);i++){
+			if(strstr(tex_files[i].name,"blank")){
+				blank_index=i;
+				break;
+			}
+		}
+		for( ;count<TEXTURE_BUTTONS;count++){
+			buttons[count].tfile=&tex_files[blank_index];
+			buttons[count].thumb=calloc(1,64*64*3);
 		}
 		buttons[0].pressed=TRUE;
 		for(i=0;i<4;i++){
@@ -324,12 +323,14 @@ int load_textures()
 		work=malloc(work_size);
 		if(work){
 			int i;
-			for(i=0;i<sizeof(jpg_list)/sizeof(struct DECOMPRESS_LIST);i++){
+			for(i=0;i<sizeof(tex_files)/sizeof(struct TEXTURE_FILE);i++){
 				unsigned char *src,*dst;
 				JDEC jdec;
 				JRESULT res;
 				struct IOBUF io;
-				src=jpg_list[i].src;
+				src=tex_files[i].src;
+				if(!src)
+					continue;
 				io.in=src;
 				io.position=0;
 				res=jd_prepare(&jdec,in_func,work,work_size,&io);
@@ -338,41 +339,22 @@ int load_textures()
 					printf("Image dimensions: %u by %u. %u bytes used.\n", jdec.width, jdec.height, work_size - jdec.sz_pool);
 					dst=malloc(decomp_size);
 					if(dst){
-						*jpg_list[i].dst=dst;
+						tex_files[i].data=dst;
 						io.out=dst;
 						io.outsize=decomp_size;
 						io.width=jdec.width;
 						res=jd_decomp(&jdec,out_func,0);
 						if(res==JDR_OK){
-							struct TEXTURE_FILE *tf;
-							tex_files[i].data=dst;
 							tex_files[i].w=jdec.width;
 							tex_files[i].h=jdec.height;
-							tf=jpg_list[i].tf;
-							if(tf){
-								tf->data=dst;
-							}
-							{
-								/*
-								FILE *f;
-								char str[80];
-								sprintf(str,"c:\\temp\\test%ix%i.bin",jdec.width,jdec.height);
-								f=fopen(str,"wb");
-								if(f){
-									fwrite(tf->data,1,tf->w*tf->h*3,f);
-									fclose(f);
-								}
-								*/
-								
-							}
 						}
 						else
 							printf("Failed to decompress: rc=%d\n", res);
+					}else{
+						printf("malloc failed size=%i\n",decomp_size);
 					}
 				}else{
-					struct TEXTURE_FILE *tf;
-					tf=jpg_list[i].tf;
-					printf("Failed to prepare: rc=%d %s\n", res,tf->name);
+					printf("Failed to prepare: rc=%d %s\n", res,tex_files[i].name);
 				}
 			}
 			free(work);
@@ -393,8 +375,8 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			int index=0;
 			int ycaption=GetSystemMetrics(SM_CYCAPTION);
 			init_texture_buttons();
-			for(j=0;j<NUM_TEXTURES/4;j++){
-				for(i=0;i<NUM_TEXTURES/4;i++){
+			for(j=0;j<TEXTURE_BUTTONS;j++){
+				for(i=0;i<4;i++){
 					HWND h;
 					h=CreateWindow("BUTTON","BUTTON",WS_CHILD|WS_VISIBLE|BS_OWNERDRAW|BS_PUSHBUTTON,4+i*(64+4),4+j*(64+4),64,64,hwnd,id,ghinstance,NULL);
 					buttons[index].hwnd=h;
@@ -404,9 +386,11 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 					id++;
 					//h=CreateWindow("TEXT","BUTTON",WS_CHILD|WS_VISIBLE|BS_OWNERDRAW|BS_PUSHBUTTON,4+i*(64+4),4+j*(64+4),64,64,hwnd,id,ghinstance,NULL);
 				}
+				if(index>=TEXTURE_BUTTONS)
+					break;
 			}
 			ShowWindow(GetDlgItem(hwnd,IDC_BUTTON1),SW_HIDE);
-			SetWindowPos(hwnd,NULL,0,0,4*2+(64+4)*4,ycaption+4*2+(64+4)*4,SWP_NOMOVE|SWP_NOZORDER);
+			SetWindowPos(hwnd,NULL,0,0,4*2+(64+4)*4,ycaption+4*2+(64+4)*TEXTURE_BUTTONS/4,SWP_NOMOVE|SWP_NOZORDER);
 			title=lparam;
 			if(title){
 				struct TEX_BUTTON *tb=gl_textures[current_channel].tex_button;
@@ -426,7 +410,7 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 				else
 					SetWindowText(hwnd,title);
 			}
-			for(i=0;i<NUM_TEXTURES;i++){
+			for(i=0;i<TEXTURE_BUTTONS;i++){
 				if(gl_textures[current_channel].tex_button){
 					struct TEX_BUTTON *tb=gl_textures[current_channel].tex_button;
 					tb->pressed=TRUE;
@@ -451,7 +435,7 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			bmi.bmiHeader.biSizeImage = ((bmi.bmiHeader.biWidth * 32 +31)& ~31) /8 * bmi.bmiHeader.biHeight;
 
 			hdc=lpDIS->hDC;
-			for(i=0;i<NUM_TEXTURES;i++){
+			for(i=0;i<TEXTURE_BUTTONS;i++){
 				if(buttons[i].id==lpDIS->CtlID){
 					texbuf=buttons[i].thumb;
 					selected=buttons[i].pressed;
@@ -492,7 +476,7 @@ LRESULT CALLBACK texture_select(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			if(LOWORD(wparam)>=IDC_BUTTON1+1){
 				int id=LOWORD(wparam);
 				int i;
-				for(i=0;i<NUM_TEXTURES;i++){
+				for(i=0;i<TEXTURE_BUTTONS;i++){
 					if(id==buttons[i].id){
 						struct TEXTURE_FILE *tf;
 						tf=buttons[i].tfile;
