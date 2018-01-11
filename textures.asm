@@ -44,10 +44,6 @@ global _tex09jpg
 _tex09jpg:
 incbin ".\textures\_tex09.jpg"
 
-global _blankjpg
-_blankjpg:
-incbin ".\textures\blank.jpg"
-
 global _tex10_64x64_L
 _tex10_64x64_L:
 incbin ".\textures\tex10_64x64_L.bin"
