@@ -41,6 +41,7 @@ extern "C" {
 void open_console();
 void hide_console();
 void move_console(int,int,int,int);
+DWORD set_console_icon(HICON hicon);
 int setupPixelFormat(HDC hDC);
 int load_call_table();
 int setup_shaders();
@@ -66,6 +67,7 @@ extern char start_dir[MAX_PATH];
 extern char *preamble,*main_preamble;
 extern char *last_shader_str;
 extern HWND hshaderview;
+extern HWND ghconsole;
 }
 
 int snap_console(HWND hwin)
@@ -81,6 +83,17 @@ int print_info()
 	printf("pause=%i\n",pause);
 	printf("click x/y=%i %i\n",clickx,clicky);
 	return 0;
+}
+extern "C" int set_bookmark(int line)
+{
+	HWND hscint;
+	hscint=nppData._scintillaMainHandle;
+	if(!hscint)
+		return 0;
+	if(line<0)
+		return SendMessage(hscint,SCI_MARKERDELETEALL,-1,0);
+	else
+		return SendMessage(hscint,SCI_MARKERADD,line,24);
 }
 LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
@@ -131,6 +144,8 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 	case WM_TIMER:
 		InvalidateRect(hwnd,NULL,FALSE);
 		return 0;
+	case WM_ACTIVATEAPP:
+		break;
 	case WM_COMMAND:
 		/*
 		switch(LOWORD(wparam)){
@@ -302,6 +317,7 @@ int set_scintilla_buffer(char *str)
 void start_shadertoy()
 {
 	open_console();
+	set_console_icon((HICON)LoadIcon(ghinstance,MAKEINTRESOURCE(IDI_ICON2)));
 	if(hshaderview==0){
 		CreateDialog((HINSTANCE)ghinstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),nppData._nppHandle,(DLGPROC)WndProc);
 		SetWindowPos(hshaderview,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW|SWP_NOZORDER);
@@ -324,6 +340,7 @@ void start_shadertoy()
 			}
 			compile_program();
 		}
+		SendMessage(nppData._nppHandle,IDM_SEARCH_CLEAR_BOOKMARKS,0,0);
 	}else{
 		ShowWindow(hshaderview,SW_SHOWNORMAL);
 	}

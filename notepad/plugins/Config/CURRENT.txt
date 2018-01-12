@@ -1,0 +1,70 @@
+void mainImage(out vec4,in vec2);void main(void){mainImage(gl_FragColor,gl_FragCoord);}
+uniform vec3      iResolution;           // viewport resolution (in pixels)
+uniform float     iGlobalTime;           // shader playback time (in seconds)
+uniform sampler2D iChannel0;          // input channel. XX = 2D/Cube
+uniform sampler2D iChannel1;          // input channel. XX = 2D/Cube
+uniform sampler2D iChannel2;          // input channel. XX = 2D/Cube
+uniform sampler2D iChannel3;          // input channel. XX = 2D/Cube
+uniform float     iChannelTime[4];       // channel playback time (in seconds)
+uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)
+uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
+uniform vec4      iDate;                 // (year, month, day, time in seconds)
+uniform float     iTime;                 // same as global time
+uniform float     iTimeDelta;            // render time (in seconds)
+uniform float     iFrame;                // shader playback frame
+
+
+float sdTorus( vec3 p, vec2 t )
+{
+  return length( vec2(length(p.xz)-t.x,p.y) )-t.y;
+}
+void ROT(inout float x,inout float y,float z)
+{
+	float tx,ty;
+	tx=x*cos(z)+y*sin(z);
+	ty=x*-sin(z)+y*cos(z);
+	x=tx;
+	y=ty;
+}
+#define PI 3.1415
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    vec2 px = (fragCoord-(iResolution.xy/2))/iResolution.y;
+    
+    vec3 ro = vec3(0.0, 0, 18);//+sin(iTime)/4);
+    vec3 rd = normalize( vec3(px,1) );
+
+    vec3  po = ro;
+    float k=0;
+	//po.x=po.z*sin(iTime);
+	//po.y+=sin(iTime)*8;
+	vec3 t;
+    for (int i = 0; i <50; i++)
+    {
+        //k = length(po.xz) - 1; //abs(sin(iTime))-.3;
+        //float h = 0.75-length(vec2(k,po.y)) ;//+sin(iTime);
+		t=po;
+		ROT(t.y,t.z,iTime);
+		float h=-sdTorus(t,vec2(3,1));
+        po += h * rd;
+		k=h;
+    }
+
+	float f;
+    f = iTime + atan(po.y*po.z + po.x*po.y,
+                                    k*po.x - po.z*po.y );
+
+	//if(
+	//f=dot(po,vec3(1,0,0));
+	//ro=normalize(po);
+	if(k>.1)
+		return;
+	if(k<-.1)
+		return;
+	
+	//ROT(t.y,t.z,iTime);
+	f=dot(rd,po)/4;
+	//f=k+6;
+	fragColor=vec4(f);
+    //fragColor = vec4(8.0*sin(16.0*f));
+}

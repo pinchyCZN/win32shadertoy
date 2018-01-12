@@ -192,10 +192,40 @@ int save_shader_str(const char *str)
 	}
 	return result;
 }
+int parse_errors(char *str)
+{
+	char *ptr=str;
+	while(1){
+		char *line;
+		ptr=strstr(ptr,"ERROR:");
+		if(!ptr)
+			break;
+		ptr+=sizeof("ERROR:");
+		line=strstr(ptr,":");
+		if(line){
+			int i,val=0;
+			line++;
+			for(i=0;i<9;i++){
+				char a=line[i];
+				if(':'==a)
+					break;
+				if(a>='0' && a<='9'){
+					val*=10;
+					val+=a-'0';
+				}
+			}
+			if(val>0){
+				set_bookmark(val-1);
+			}
+		}
+	}
+	return 0;
+}
 int gl_check_compile(int id)
 {
 	int result=0;
 	glGetShaderiv(id, GL_COMPILE_STATUS, &result);
+	set_bookmark(-1);
 	if(!result){
 		int logLen=0;
 		printf("Shader compilation failed!\n");
@@ -208,6 +238,7 @@ int gl_check_compile(int id)
 				int written=0;
 				glGetShaderInfoLog(id, logLen, &written, log);
 				printf("Shader log:\n%s", log);
+				parse_errors(log);
 				free(log);
 			}
 		}

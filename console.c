@@ -5,6 +5,7 @@
 
 HWND ghconsole=0;
 int _open_osfhandle(long,int);
+static DWORD(WINAPI *SetConsoleIcon)(HICON)=0;
 
 void open_console()
 {
@@ -12,7 +13,7 @@ void open_console()
 	FILE *hf;
 	static BYTE consolecreated=FALSE;
 	static int hcrt=0;
-	static HWND (*GetConsoleWindow)(void)=0;
+	static HWND (WINAPI *GetConsoleWindow)(void)=0;
 
 	if(consolecreated==TRUE)
 	{
@@ -33,10 +34,11 @@ void open_console()
 	if(GetConsoleWindow==0){
 		HMODULE hmod=LoadLibrary(TEXT("kernel32.dll"));
 		if(hmod!=0){
-			GetConsoleWindow=(HWND (*)(void))GetProcAddress(hmod,"GetConsoleWindow");
+			GetConsoleWindow=(HWND (WINAPI *)(void))GetProcAddress(hmod,"GetConsoleWindow");
 			if(GetConsoleWindow!=0){
 				ghconsole=GetConsoleWindow();
 			}
+			SetConsoleIcon=(DWORD(WINAPI *)(HICON))GetProcAddress(hmod,"SetConsoleIcon");
 		}
 	}
 
@@ -63,4 +65,12 @@ void move_console(int x,int y,int w,int h)
 	}
 	set_window_pos(ghconsole,x,y,w,h,0);
 	return;
+}
+DWORD set_console_icon(HICON hicon)
+{
+	int result=FALSE;
+	if(SetConsoleIcon && hicon){
+		result=SetConsoleIcon(hicon);
+	}
+	return result;
 }
