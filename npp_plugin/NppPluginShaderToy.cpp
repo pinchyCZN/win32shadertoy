@@ -55,6 +55,9 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam);
 int compile_shader_str(char *str);
 int load_settings();
 int needs_main_preamble(char *str);
+int get_sample_str(char **str);
+int get_current_fname(char *str,int len);
+int save_current_fname(char *str);
 extern HINSTANCE ghinstance;
 extern int screenw,screenh;
 extern int lmb_down,clickx,clicky;
@@ -219,6 +222,15 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 		if(! ((GetKeyState(VK_CONTROL)&0x8000) || (GetKeyState(VK_SHIFT)&0x8000)) ){
 			save_window_pos(hwnd,"MAIN_WINDOW");
 		}
+		{
+			WCHAR tmp[MAX_PATH]={0};
+			char str[MAX_PATH]={0};
+			SendMessage(nppData._nppHandle,NPPM_GETFULLCURRENTPATH,sizeof(tmp)/sizeof(WCHAR),(LPARAM)tmp);
+			if(tmp[0]!=0){
+				wcstombs(str,tmp,sizeof(str));
+				save_current_fname(str);
+			}
+		}
 		hide_console();
 		KillTimer(hwnd,timer_id);
 		hshaderview=0;
@@ -322,24 +334,30 @@ void start_shadertoy()
 		CreateDialog((HINSTANCE)ghinstance,MAKEINTRESOURCE(IDD_SHADER_VIEW),nppData._nppHandle,(DLGPROC)WndProc);
 		SetWindowPos(hshaderview,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW|SWP_NOZORDER);
 		WCHAR str[MAX_PATH]={0};
-		SendMessage(nppData._nppHandle,NPPM_GETPLUGINSCONFIGDIR,sizeof(str),(LPARAM)str);
-		if(str[0]!=0){
-			_snwprintf(str,sizeof(str)/sizeof(TCHAR),L"%s\\%s",str,L"CURRENT.txt");
-			if(file_exist(str)){
-				SendMessage(nppData._nppHandle,NPPM_DOOPEN,0,(LPARAM)str);
-				SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str);
-				SendMessage(nppData._nppHandle,NPPM_SETCURRENTLANGTYPE,0,L_C);
-			}else{
-				if(!SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str)){
-					int buf_id;
-					SendMessage(nppData._nppHandle,NPPM_MENUCOMMAND,0,IDM_FILE_NEW);
-					buf_id=SendMessage(nppData._nppHandle,NPPM_GETCURRENTBUFFERID,0,0);
-					SendMessage(nppData._nppHandle,NPPM_INTERNAL_SETFILENAME,buf_id,(LPARAM)str);
-					SendMessage(nppData._nppHandle,NPPM_SETCURRENTLANGTYPE,0,L_C);
-				}
-			}
-			compile_program();
+		char tmp[MAX_PATH]={0};
+		if(get_current_fname(tmp,sizeof(tmp))){
+			mbstowcs(str,tmp,sizeof(str)/sizeof(WCHAR));
+			str[sizeof(str)/sizeof(WCHAR)-1]=0;
 		}
+		if(str[0]!=0 && file_exist(str)){
+			SendMessage(nppData._nppHandle,NPPM_DOOPEN,0,(LPARAM)str);
+			SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str);
+			SendMessage(nppData._nppHandle,NPPM_SETCURRENTLANGTYPE,0,L_C);
+		}else{
+			if(!SendMessage(nppData._nppHandle,NPPM_SWITCHTOFILE,0,(LPARAM)str)){
+				int buf_id;
+				char *tmp=0;
+				SendMessage(nppData._nppHandle,NPPM_MENUCOMMAND,0,IDM_FILE_NEW);
+				buf_id=SendMessage(nppData._nppHandle,NPPM_GETCURRENTBUFFERID,0,0);
+				if(str[0]!=0)
+					SendMessage(nppData._nppHandle,NPPM_INTERNAL_SETFILENAME,buf_id,(LPARAM)str);
+				SendMessage(nppData._nppHandle,NPPM_SETCURRENTLANGTYPE,0,L_C);
+				get_sample_str(&tmp);
+				if(tmp!=0)
+					set_scintilla_buffer(tmp);
+			}
+		}
+		compile_program();
 		SendMessage(nppData._nppHandle,IDM_SEARCH_CLEAR_BOOKMARKS,0,0);
 	}else{
 		ShowWindow(hshaderview,SW_SHOWNORMAL);
@@ -431,8 +449,13 @@ extern "C" __declspec(dllexport) void setInfo(NppData notpadPlusData)
 	wcstombs(tmp,str,sizeof(tmp));
 	strncpy(ini_file,tmp,sizeof(ini_file));
 	if(ini_file[0]!=0){
-		_snprintf(ini_file,sizeof(ini_file),"%s\\%s",ini_file,"SHADER_TOY.INI");
+		DWORD attr;
 		strncpy(start_dir,tmp,sizeof(start_dir));
+		attr=GetFileAttributesA(start_dir);
+		if(attr==MAXDWORD){
+			CreateDirectoryA(start_dir,NULL);
+		}
+		_snprintf(ini_file,sizeof(ini_file),"%s\\%s",ini_file,"SHADER_TOY.INI");
 	}
 	load_settings();
 #ifdef _DEBUG
@@ -459,8 +482,13 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 	switch (notifyCode->nmhdr.code) 
 	{
 	case SCN_MODIFIED:
-		if(compile_on_modify)
-			compile_program();
+		if(notifyCode->modificationType&(SC_MOD_INSERTTEXT|SC_MOD_DELETETEXT)){
+			if(compile_on_modify){
+				compile_on_modify=FALSE;
+				compile_program();
+				compile_on_modify=TRUE;
+			}
+		}
 		break;
 	default:
 		return;

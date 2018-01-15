@@ -15,13 +15,20 @@ int set_window_pos(HWND hwnd,int x,int y,int w,int h,int max)
 	hmon=MonitorFromRect(&rect,MONITOR_DEFAULTTONEAREST);
 	mi.cbSize=sizeof(mi);
 	if(GetMonitorInfo(hmon,&mi)){
+		int cw,ch;
 		rect=mi.rcWork;
-		if((x+w)>rect.right)
-			x=rect.right-w;
+		cw=w;
+		ch=h;
+		if(0==cw)
+			cw=100;
+		if(0==ch)
+			ch=100;
+		if((x+cw)>rect.right)
+			x=rect.right-cw;
 		if(x<rect.left)
 			x=rect.left;
-		if((y+h)>rect.bottom)
-			y=rect.bottom-h;
+		if((y+ch)>rect.bottom)
+			y=rect.bottom-ch;
 		if(y<rect.top)
 			y=rect.top;
 		if(w>0 && h>0){
@@ -43,11 +50,25 @@ int set_window_pos(HWND hwnd,int x,int y,int w,int h,int max)
 				flags|=SW_MAXIMIZE;
 			if(w==0 || h==0)
 				flags|=SWP_NOSIZE;
-			SetWindowPos(hwnd,HWND_TOP,x,y,w,h,flags);
+			SetWindowPos(hwnd,NULL,x,y,w,h,flags);
 		}
 		result=TRUE;
 	}
 	return result;
+}
+int set_win_pos_relative(HWND hparent,HWND hwin,int x,int y)
+{
+	RECT rect;
+	int w,h;
+	if(0==hparent || 0==hwin)
+		return 0;
+	GetWindowRect(hparent,&rect);
+	x=rect.left+x;
+	y=rect.top+y;
+	GetWindowRect(hwin,&rect);
+	w=rect.right-rect.left;
+	h=rect.bottom-rect.top;
+	return set_window_pos(hwin,x,y,w,h,FALSE);
 }
 int restore_scroll(HWND hedit,const char *WINDOW_NAME)
 {

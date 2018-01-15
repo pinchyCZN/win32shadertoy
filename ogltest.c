@@ -58,7 +58,7 @@ HWND heditwin=0;
 HINSTANCE ghinstance=0;
 int vertid=0,fragid=0,progid=0;
 int load_preamble=TRUE;
-int use_new_format=FALSE;
+int use_new_format=TRUE;
 int compile_on_modify=FALSE;
 int src_sample=0;
 char start_dir[MAX_PATH]={0};
@@ -290,54 +290,27 @@ int load_shader_string(const char *str)
 	}
 	return TRUE;
 }
-int load_frag_shader()
+int get_sample_str(char **str)
 {
-	FILE *f;
-	char fname[MAX_PATH]="";
-	load_current_path(fname,sizeof(fname));
-	f=fopen(fname,"rb");
-	if(f){
-		int len;
-		printf("loading file %s\n",fname);
-		fseek(f,0,SEEK_END);
-		len=ftell(f);
-		fseek(f,0,SEEK_SET);
-		if(len>0){
-			char *buf;
-			int blen=len+4;
-			buf=malloc(blen);
-			if(buf){
-				memset(buf,0,blen);
-				fread(buf,1,len,f);
-				load_shader_string(buf);
-				free(buf);
-			}
-
-		}
-		fclose(f);
-	}
-	else{
-		printf("cant open file %s\n",fname);
-		printf("loading sample instead,load other samples from settings dialog\n");
-		{
-			const char *str;
-			int rnd;
-			srand(GetTickCount());
-			rnd=rand()&1;
-			if(rnd){
-				str=sample2;
-				src_sample=3;
-			}
-			else{
-				str=sample1;
-				src_sample=2;
-			}
-			str=sample3;
-			src_sample=1;
-			load_shader_string(str);
-		}
-	}
-	return 0;
+	int x=rand()%3;
+	*str=sample1;
+	if(1==x)
+		*str=sample2;
+	else if(2==x)
+		*str=sample3;
+	return TRUE;
+}
+int get_current_fname(char *str,int len)
+{
+	int result=FALSE;
+	get_ini_str("SETTINGS","LAST_FILE",str,len);
+	if(str[0]!=0)
+		result=TRUE;
+	return result;
+}
+int save_current_fname(char *str)
+{
+	return write_ini_str("SETTINGS","LAST_FILE",str);
 }
 
 void get_time(float *time)
@@ -616,64 +589,6 @@ int compile(HWND hwin)
 	return result;
 }
 
-int save_text(hedit,hstatus)
-{
-	if(hedit){
-		char *s;
-		int size=0x10000;
-		s=malloc(size);
-		if(s){
-			FILE *f;
-			char path[MAX_PATH]={0};
-			GetWindowTextA(hedit,s,size);
-			load_current_path(path,sizeof(path));
-			f=fopen(path,"wb");
-			if(f){
-				int len;
-				len=strlen(s);
-				fwrite(s,1,len,f);
-				fclose(f);
-				SetWindowTextA(hstatus,path);
-			}
-			free(s);
-		}
-	}
-	return 0;
-}
-int load_current_path(char *path,int len)
-{
-	if(path && len>0){
-		_snprintf(path,len,"%s\\%s",start_dir,"current.txt");
-		path[len-1]=0;
-	}
-	return 0;
-}
-int load_current(hedit)
-{
-	if(hedit){
-		char *s;
-		int size=0x10000;
-		s=malloc(size);
-		if(s){
-			FILE *f;
-			char path[MAX_PATH]={0};
-			load_current_path(path,sizeof(path));
-			f=fopen(path,"rb");
-			if(f){
-				CHARRANGE cr;
-				cr.cpMax=-1;
-				cr.cpMin=-1;
-				memset(s,0,size);
-				fread(s,1,size-1,f);
-				fclose(f);
-				SetWindowTextA(hedit,s);
-				SendMessage(hedit,EM_EXSETSEL,0,&cr);
-			}
-			free(s);
-		}
-	}
-	return 0;
-}
 struct SETTING{
 	char *key;
 	int *val;

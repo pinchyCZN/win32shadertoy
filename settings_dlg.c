@@ -170,25 +170,7 @@ int downsample(unsigned char *inbuf,int inw,int inh,int bpp,unsigned char *outbu
 	}
 	return TRUE;
 }
-			/*
-			int x,y;
-			for(x=0;x<64;x++){
-				for(y=0;y<64;y++){
-					int delta;
-					for(delta=0;delta<3;delta++){
-						int i,j,c=0;
-						int flip;
-						for(i=0;i<8;i++){
-							for(j=0;j<8;j++){
-								c+=tex02_512x512_RGB[2-delta+i*3+j*3*512+x*8*3+y*3*512*8];
-							}
-						}
-						flip=(64*3*63);
-						data[delta+x*3+flip-y*64*3]=c/64; //tex00_512x512_RGB[index+(2-p)];
-					}
-				}
-			}
-			*/
+
 
 int bind_textures(struct GL_TEXTURE_INFO *textures)
 {
@@ -543,14 +525,6 @@ int toggle_window_size(HWND hwnd)
 		}
 
 	}
-	/*
-	if((rect.right-rect.left)>=(w/2)){
-		SetWindowPos(hview,NULL,0,0,140,160,SWP_NOZORDER);
-	}
-	else{
-		SetWindowPos(hview,NULL,0,0,w/2,h/2,SWP_NOZORDER);
-	}
-	*/
 	return TRUE;
 }
 int populate_sample_list(HWND hlist,int cur_sel)
@@ -582,6 +556,34 @@ int set_checkbox(HWND hwnd,int idc,int val)
 		SendDlgItemMessage(hwnd,idc,BM_SETCHECK,BST_CHECKED,0);
 	return TRUE;
 }
+int restore_rel_position(HWND hwnd)
+{
+	int x=0,y=0;
+	int result=FALSE;
+	get_ini_value("SETTINGS","XPOS",&x);
+	get_ini_value("SETTINGS","YPOS",&y);
+	if(x!=0 && y!=0){
+		HWND hparent=GetParent(hwnd);
+		if(hparent)
+			result=set_win_pos_relative(hparent,hwnd,x,y);
+	}
+	return result;
+}
+int save_rel_position(HWND hwnd)
+{
+	RECT ra,rb;
+	int x,y;
+	HWND hparent=GetParent(hwnd);
+	if(0==hparent)
+		return 0;
+	GetWindowRect(hparent,&ra);
+	GetWindowRect(hwnd,&rb);
+	x=rb.left-ra.left;
+	y=rb.top-ra.top;
+	write_ini_value("SETTINGS","XPOS",x);
+	write_ini_value("SETTINGS","YPOS",y);
+	return 0;
+}
 LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 {
 	extern void compile_program();
@@ -610,6 +612,7 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			set_checkbox(hwnd,IDC_LOAD_PREAMBLE,load_preamble);
 			set_checkbox(hwnd,IDC_NEWFORMAT,use_new_format);
 			set_checkbox(hwnd,IDC_COMPILE_ON_MODIFY,compile_on_modify);
+			restore_rel_position(hwnd);
 		}
 		break;
 	case WM_COMMAND:
@@ -671,9 +674,11 @@ LRESULT CALLBACK settings_proc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			break;
 
 		case IDCANCEL:
+			save_rel_position(hwnd);
 			EndDialog(hwnd,0);
 			break;
 		case IDOK:
+			save_rel_position(hwnd);
 			save_settings();
 			EndDialog(hwnd,0);
 			break;
