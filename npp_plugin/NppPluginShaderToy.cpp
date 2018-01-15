@@ -178,6 +178,11 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			print_info();
 			return TRUE;
 			break;
+		case VK_TAB:
+			if(GetFocus()==hwnd){
+				SetFocus(nppData._scintillaMainHandle);
+			}
+			break;
 		}
 		break;
 	case WM_SIZE:
@@ -227,8 +232,11 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT msg,WPARAM wparam,LPARAM lparam)
 			char str[MAX_PATH]={0};
 			SendMessage(nppData._nppHandle,NPPM_GETFULLCURRENTPATH,sizeof(tmp)/sizeof(WCHAR),(LPARAM)tmp);
 			if(tmp[0]!=0){
-				wcstombs(str,tmp,sizeof(str));
-				save_current_fname(str);
+				DWORD attr=GetFileAttributesW(tmp);
+				if(attr!=MAXDWORD && (!(attr&FILE_ATTRIBUTE_DIRECTORY))){
+					wcstombs(str,tmp,sizeof(str));
+					save_current_fname(str);
+				}
 			}
 		}
 		hide_console();

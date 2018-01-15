@@ -303,14 +303,14 @@ int get_sample_str(char **str)
 int get_current_fname(char *str,int len)
 {
 	int result=FALSE;
-	get_ini_str("SETTINGS","LAST_FILE",str,len);
+	get_ini_str("EDITOR","LAST_FILE",str,len);
 	if(str[0]!=0)
 		result=TRUE;
 	return result;
 }
 int save_current_fname(char *str)
 {
-	return write_ini_str("SETTINGS","LAST_FILE",str);
+	return write_ini_str("EDITOR","LAST_FILE",str);
 }
 
 void get_time(float *time)
